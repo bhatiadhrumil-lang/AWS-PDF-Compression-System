@@ -1,0 +1,9 @@
+body{font-family:Arial,sans-serif;background:#f5f7fb;margin:0}
+header{background:#2563eb;color:#fff;text-align:center;padding:30px}
+.container{display:grid;grid-template-columns:1fr 1fr;gap:20px;padding:30px}
+.upload-card,.status-card{background:#fff;padding:20px;border-radius:10px;box-shadow:0 5px 15px rgba(0,0,0,.1)}
+.progress-bar{height:12px;background:#ddd;border-radius:20px;overflow:hidden;margin:15px 0}
+#progressFill{height:100%;width:0;background:#2563eb}
+button{background:#2563eb;color:#fff;border:none;padding:12px 18px;border-radius:6px;cursor:pointer}
+button:disabled{background:#999}
+@media(max-width:800px){.container{grid-template-columns:1fr}}

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AWS PDF Compression System</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js"></script>
+</head>
+<body>
+<header>
+<h1>AWS PDF Compression System</h1>
+<p>Upload PDF → S3 → Lambda → Compressed PDF</p>
+</header>
+
+<main class="container">
+<section class="upload-card">
+<input id="pdfFile" type="file" accept=".pdf">
+<p id="fileName">No file selected</p>
+<p id="fileSize">0 KB</p>
+
+<div class="progress-bar">
+<div id="progressFill"></div>
+</div>
+<p id="progressPercent">0%</p>
+
+<button id="uploadBtn">Upload PDF</button>
+</section>
+
+<section class="status-card">
+<h2>Status</h2>
+<p id="statusText">Ready</p>
+
+<ul>
+<li id="stepSelect">Select PDF</li>
+<li id="stepUpload">Upload</li>
+<li id="stepLambda">Lambda</li>
+<li id="stepOutput">Output</li>
+</ul>
+
+<p id="downloadMessage">Waiting for compressed PDF...</p>
+<button id="downloadBtn" disabled>Download PDF</button>
+</section>
+</main>
+
+<script src="script.js"></script>
+</body>
+</html>
