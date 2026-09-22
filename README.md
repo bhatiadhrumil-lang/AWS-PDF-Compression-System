@@ -14,7 +14,7 @@ static files on S3 website hosting.
 * [x] Multi-tool homepage (popular + all-tools grids rendered from one registry)
 * [x] Compress PDF page (drag & drop, progress, compression stats, download)
 * [x] Merge PDF page (multi-file picker + drag & drop, reorder, manifest upload, exact-output polling, download)
-* [x] Split PDF page (single-file picker + drag & drop, every-page / ranges modes, manifest upload, exact-ZIP polling, download) — implemented + tested, NOT deployed
+* [x] Split PDF page (single-file picker + drag & drop, every-page / ranges modes, manifest upload, exact-ZIP polling, download) — implemented, deployed, verified end-to-end
 * [x] S3 upload via Cognito unauthenticated credentials (preserved behavior)
 * [x] AWS Lambda processing status polling (preserved behavior)
 * [x] S3 output presigned-URL download, 5-minute expiry (preserved behavior)
@@ -148,10 +148,13 @@ Status:
 
 Status:
 
-* Backend: Implemented + local/docker-tested, **NOT deployed** (no
-  `.split.json` trigger yet; Lambda still runs the pre-split image).
-* Frontend: Implemented + statically tested, **NOT deployed** (live site
-  still serves the pre-split pages).
+* Backend: Implemented + deployed + verified (Lambda runs the split image;
+  `.split.json` suffix notification active; split-all and ranges ZIPs
+  validated on AWS, compress + merge regressions green).
+* Frontend: Implemented + deployed to the S3 static website
+  (`pdf-compressor-website-868942372673`, us-east-2) — Split PDF UI is live
+  end-to-end, including a real headless-browser run (upload → ranges split
+  → ZIP download with correct pages).
 
 * Single-file upload: picker + drag & drop, PDF extension + 100 MB checked
   before upload; only the first file is kept if several are dropped.
