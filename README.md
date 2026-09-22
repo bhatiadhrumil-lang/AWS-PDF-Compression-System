@@ -121,14 +121,11 @@ validation is static plus manual walkthrough (see commit message / PR notes).
 
 Status:
 
-* Backend: Implemented
-* Frontend: Implemented
-* AWS Deployment: Pending
-
-The merge backend exists in the backend repository but its Lambda trigger
-(`.merge.json` suffix notification) has NOT been deployed yet, so end-to-end
-merging will start working only after that deployment. No S3 deployment was
-done from this change.
+* Backend: Implemented and deployed (Lambda runs the merge image;
+  `.merge.json` suffix notification active on the input bucket).
+* Frontend: Implemented and deployed to the S3 static website
+  (`pdf-compressor-website-868942372673`, us-east-2) — Merge PDF UI is live
+  end-to-end.
 
 * Multi-file upload: picker (multiple) + drag & drop, “+ Add more PDFs”
   appends without resetting the list.
@@ -149,5 +146,12 @@ done from this change.
 
 ## Deployment
 
-Not automatic. Review → test → approve first; S3 website sync and any CI/CD
-are handled separately. Never commit `.env` files, credentials, or keys.
+Frontend is served from the existing S3 static website bucket
+`pdf-compressor-website-868942372673` (us-east-2,
+`pdf-compressor-website-868942372673.s3-website.us-east-2.amazonaws.com`).
+Deploy with `aws s3 sync` WITHOUT `--delete` (legacy objects such as the
+original `script.js`/`style.css` stay in place untouched): HTML with
+`Cache-Control: no-cache`, JS/CSS with
+`Cache-Control: public, max-age=300, must-revalidate`. Website
+configuration (index document) is left as-is. Never commit `.env` files,
+credentials, or keys.
