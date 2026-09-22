@@ -47,9 +47,9 @@ window.PdfTools = [
     title: "Rotate PDF",
     description: "Rotate pages to the correct orientation.",
     icon: "rotate",
-    status: "soon",
-    href: "tool.html?tool=rotate",
-    badge: "Coming soon"
+    status: "available",
+    href: "rotate.html",
+    badge: "Available"
   },
   {
     id: "delete-pages",

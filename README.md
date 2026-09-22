@@ -15,6 +15,7 @@ static files on S3 website hosting.
 * [x] Compress PDF page (drag & drop, progress, compression stats, download)
 * [x] Merge PDF page (multi-file picker + drag & drop, reorder, manifest upload, exact-output polling, download)
 * [x] Split PDF page (single-file picker + drag & drop, every-page / ranges modes, manifest upload, exact-ZIP polling, download) — implemented, deployed, verified end-to-end
+* [x] Rotate PDF page (single-file picker + drag & drop, 90°/180°/270° + all/selected pages, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
 * [x] S3 upload via Cognito unauthenticated credentials (preserved behavior)
 * [x] AWS Lambda processing status polling (preserved behavior)
 * [x] S3 output presigned-URL download, 5-minute expiry (preserved behavior)
@@ -22,7 +23,6 @@ static files on S3 website hosting.
 * [x] Friendly errors with expandable technical details
 * [x] Editor + future-tool placeholder pages (honest “Coming soon”, no fake processing)
 * [ ] Edit PDF
-* [ ] Rotate PDF
 * [ ] Delete Pages
 * [ ] Extract Pages
 * [ ] PDF to JPG
@@ -31,7 +31,8 @@ static files on S3 website hosting.
 * [ ] Add Page Numbers
 * [ ] Protect PDF
 
-Only `[x]` items actually work. Everything else is a clearly-marked placeholder.
+Only `[x]` items actually work live, except where an item is explicitly
+marked NOT deployed (code-complete but awaiting its deployment phase).
 
 ## Frontend architecture
 
@@ -173,6 +174,36 @@ Status:
 * Output handling: the frontend polls HeadObject for the EXACT key
   `split/<id>/<stem>-split.zip` (same polling pattern) — then a single
   “Download ZIP” button uses the existing 5-minute presigned URL mechanism.
+
+### Rotate PDF
+
+Status:
+
+* Backend: Implemented + local/docker-tested, **NOT deployed** (no
+  `.rotate.json` trigger yet; Lambda still runs the pre-rotate image).
+* Frontend: Implemented + statically tested, **NOT deployed** (live site
+  still serves the pre-rotate pages).
+
+* Single-file upload: picker + drag & drop, PDF extension + 100 MB checked
+  before upload; only the first file is kept if several are dropped.
+* Rotation: 90° clockwise / 180° / 270° clockwise radios (exactly the
+  backend's supported values; anything else is rejected client-side too).
+* Pages: “All pages” or “Selected pages” with a `1-3, 5, 8-10` textbox.
+  Range validation reuses the split parser (`parseSplitRanges` — one
+  parser, no drift): singles, spans, whitespace tolerated; rejects 0,
+  reversed, malformed, empty, duplicate and overlapping ranges, and more
+  than 50 ranges. Page-count bounds are left to the backend.
+* Manifest architecture: one `crypto.randomUUID()` request id per job; the
+  PDF goes to `uploads/<id>/<safe>.pdf`, then the manifest
+  `rotate-requests/<id>.rotate.json` is uploaded LAST (single Lambda
+  trigger): `{ "operation": "rotate", "input": ..., "rotation": 90,
+  "pages": "all" | [...], "output_name": "<safe>.pdf" }` (`pages` omitted
+  for `"all"`). A failed PDF upload rejects the chain, so the manifest is
+  never sent.
+* Output handling: the frontend polls HeadObject for the EXACT key
+  `rotate/<id>/<stem>-rotated.pdf` (same polling pattern) — then a single
+  “Download rotated PDF” button uses the existing 5-minute presigned URL
+  mechanism.
 
 ## Deployment
 

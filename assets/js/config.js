@@ -28,6 +28,15 @@ window.PdfConfig = {
   SPLIT_OUTPUT_DIR: "split",
   SPLIT_INPUT_PREFIX: "uploads/",
 
+  /* Rotate PDF constants (mirror backend contract; client-side only).
+   * Page-range syntax/limits are shared with split; rotation choices are
+   * exactly the backend's supported degrees clockwise. */
+  ROTATE_MANIFEST_PREFIX: "rotate-requests/",
+  ROTATE_MANIFEST_SUFFIX: ".rotate.json",
+  ROTATE_OUTPUT_DIR: "rotate",
+  ROTATE_INPUT_PREFIX: "uploads/",
+  ROTATE_OPTIONS: [90, 180, 270],
+
   /* Output polling: every 5s, up to ~2 minutes (matches Lambda timeout budget). */
   POLL_INTERVAL_MS: 5000,
   POLL_MAX_ATTEMPTS: 24,

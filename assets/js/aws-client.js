@@ -506,6 +506,93 @@ window.PdfCloud = (function () {
     });
   }
 
+  /* ---------------- Rotate PDF helpers (additive; others untouched) ------
+   *
+   * Backend rotate contract (see backend repo README, reference only):
+   *   input:   "uploads/<request-id>/<safe>.pdf" (same INPUT bucket)
+   *   manifest:"rotate-requests/<request-id>.rotate.json" (uploaded AFTER pdf)
+   *     { "operation": "rotate", "input": ..., "rotation": 90 | 180 | 270,
+   *       "pages": "all" | ["1-3", "5"], "output_name": "<safe>.pdf" }
+   *   output:  "rotate/<request-id>/<stem>-rotated.pdf" (exact poll)
+   *
+   * Page-range syntax is identical to split, so parseSplitRanges is reused
+   * directly — one parser, no drift. Rotation labels are UI-only; the
+   * manifest carries the numeric degrees clockwise.
+   */
+
+  function newRotateRequestId() {
+    return newMergeRequestId();
+  }
+
+  function rotateInputKey(requestId, safeBaseName) {
+    return "uploads/" + String(requestId) + "/" + String(safeBaseName);
+  }
+
+  function rotateManifestKey(requestId) {
+    return cfg.ROTATE_MANIFEST_PREFIX + String(requestId) + cfg.ROTATE_MANIFEST_SUFFIX;
+  }
+
+  /* Mirror of backend stem sanitization (shared with split stems). */
+  function sanitizeRotateStem(name, fallbackId) {
+    return sanitizeSplitStem(name, fallbackId);
+  }
+
+  /* Deterministic output key: "rotate/<id>/<stem>-rotated.pdf". The backend
+   * derives the identical key, so the page polls this EXACT object. */
+  function expectedRotateOutputKey(requestId, outputName) {
+    var id = String(requestId);
+    var stem = sanitizeRotateStem(outputName, id);
+    return cfg.ROTATE_OUTPUT_DIR + "/" + id + "/" + stem + "-rotated.pdf";
+  }
+
+  /* Pure manifest builder. "all" carries no pages list (backend defaults);
+   * selected pages carry the token list in order. */
+  function buildRotateManifest(requestId, inputKey, rotation, pages, outputName) {
+    var manifest = {
+      operation: "rotate",
+      input: inputKey,
+      rotation: rotation,
+      output_name: outputName || (String(requestId) + ".pdf")
+    };
+    if (pages !== "all") {
+      manifest.pages = (pages || []).slice();
+    }
+    return manifest;
+  }
+
+  /* Pure rotation validator: exactly 90, 180, or 270. */
+  function parseRotateAngle(value) {
+    var options = cfg.ROTATE_OPTIONS || [90, 180, 270];
+    var angle = typeof value === "string" && value.trim() !== ""
+      ? Number(value) : value;
+    if (typeof angle !== "number" || Math.floor(angle) !== angle ||
+        options.indexOf(angle) === -1) {
+      return { ok: false, angle: 0,
+               error: "Choose a rotation: 90°, 180°, or 270°." };
+    }
+    return { ok: true, angle: angle, error: "" };
+  }
+
+  /* Upload the rotate manifest (final trigger — call only after the PDF
+   * upload succeeded). Resolves with the manifest key. */
+  function putRotateManifest(requestId, manifestObj) {
+    var key = rotateManifestKey(requestId);
+    var body = JSON.stringify(manifestObj);
+    return ensureCredentials().then(function () {
+      return new Promise(function (resolve, reject) {
+        s3.putObject({
+          Bucket: cfg.INPUT_BUCKET,
+          Key: key,
+          Body: body,
+          ContentType: "application/json"
+        }, function (err) {
+          if (err) reject(err);
+          else resolve(key);
+        });
+      });
+    });
+  }
+
   function technicalDetails(err) {
     if (!err) return "No technical details available.";
     var code = err.code || err.name || "UnknownError";
@@ -547,6 +634,14 @@ window.PdfCloud = (function () {
     buildSplitManifest: buildSplitManifest,
     parseSplitRanges: parseSplitRanges,
     putSplitManifest: putSplitManifest,
+    newRotateRequestId: newRotateRequestId,
+    rotateInputKey: rotateInputKey,
+    rotateManifestKey: rotateManifestKey,
+    sanitizeRotateStem: sanitizeRotateStem,
+    expectedRotateOutputKey: expectedRotateOutputKey,
+    buildRotateManifest: buildRotateManifest,
+    parseRotateAngle: parseRotateAngle,
+    putRotateManifest: putRotateManifest,
     friendlyError: friendlyError,
     technicalDetails: technicalDetails,
     formatBytes: formatBytes

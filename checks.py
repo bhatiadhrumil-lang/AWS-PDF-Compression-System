@@ -27,12 +27,13 @@ def ok(msg):
     print("ok:", msg)
 
 
-HTML_FILES = ["index.html", "compress.html", "merge.html", "split.html", "edit.html", "tool.html"]
+HTML_FILES = ["index.html", "compress.html", "merge.html", "split.html", "rotate.html", "edit.html", "tool.html"]
 JS_BY_PAGE = {
     "index.html": ["assets/js/config.js", "assets/js/tools.js", "assets/js/home.js"],
     "compress.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/compress.js"],
     "merge.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/merge.js"],
     "split.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/split.js"],
+    "rotate.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/rotate.js"],
     "edit.html": [],
     "tool.html": ["assets/js/tools.js", "assets/js/tool.js"],
 }
@@ -45,12 +46,14 @@ for page, scripts in JS_BY_PAGE.items():
         js = (ROOT / script).read_text(encoding="utf-8")
         refs = set(re.findall(r'(?:getElementById|\$\()\s*["\']([^"\']+)["\']', js))
         # compress.js builds stepper ids dynamically ("step"+Capitalized),
-        # merge.js builds "mergeStep"+Capitalized, split.js "splitStep"+Capitalized.
-        missing = {r for r in refs if r not in defined and not r.startswith("step") and not r.startswith("mergeStep") and not r.startswith("splitStep") and r not in ("mergeStep", "splitStep")}
+        # merge.js builds "mergeStep"+Capitalized, split.js "splitStep"+Capitalized,
+        # rotate.js "rotateStep"+Capitalized.
+        missing = {r for r in refs if r not in defined and not r.startswith("step") and not r.startswith("mergeStep") and not r.startswith("splitStep") and not r.startswith("rotateStep") and r not in ("mergeStep", "splitStep", "rotateStep")}
         # resolve dynamic stepper ids explicitly
         dyn_ok = all(("step" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
         merge_dyn_ok = all(("mergeStep" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
         split_dyn_ok = all(("splitStep" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
+        rotate_dyn_ok = all(("rotateStep" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
         if missing:
             fail(f"{page} <- {script}: missing ids {sorted(missing)}")
         elif script == "assets/js/compress.js" and not dyn_ok:
@@ -59,6 +62,8 @@ for page, scripts in JS_BY_PAGE.items():
             fail(f"{page}: dynamic merge stepper ids missing")
         elif script == "assets/js/split.js" and not split_dyn_ok:
             fail(f"{page}: dynamic split stepper ids missing")
+        elif script == "assets/js/rotate.js" and not rotate_dyn_ok:
+            fail(f"{page}: dynamic rotate stepper ids missing")
         else:
             ok(f"{page} <- {script}: ids resolve")
 
