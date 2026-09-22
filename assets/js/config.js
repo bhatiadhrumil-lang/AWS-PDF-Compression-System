@@ -20,6 +20,14 @@ window.PdfConfig = {
   MERGE_OUTPUT_PREFIX: "merged-",
   MERGE_INPUT_PREFIX: "uploads/",
 
+  /* Split PDF guardrails (mirror backend defaults; client-side only). */
+  SPLIT_MAX_RANGES: 50,
+  SPLIT_MAX_OUTPUTS: 200,
+  SPLIT_MANIFEST_PREFIX: "split-requests/",
+  SPLIT_MANIFEST_SUFFIX: ".split.json",
+  SPLIT_OUTPUT_DIR: "split",
+  SPLIT_INPUT_PREFIX: "uploads/",
+
   /* Output polling: every 5s, up to ~2 minutes (matches Lambda timeout budget). */
   POLL_INTERVAL_MS: 5000,
   POLL_MAX_ATTEMPTS: 24,

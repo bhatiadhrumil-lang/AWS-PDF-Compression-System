@@ -38,9 +38,9 @@ window.PdfTools = [
     title: "Split PDF",
     description: "Extract pages or divide a PDF into parts.",
     icon: "split",
-    status: "soon",
-    href: "tool.html?tool=split",
-    badge: "Coming soon"
+    status: "available",
+    href: "split.html",
+    badge: "Available"
   },
   {
     id: "rotate",

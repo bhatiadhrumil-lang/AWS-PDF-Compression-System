@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Split a PDF into individual pages or custom page ranges — download as ZIP. Powered by AWS.">
+<title>Split PDF — PDF Toolkit</title>
+<link rel="stylesheet" href="assets/css/styles.css">
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js" defer></script>
+<script src="assets/js/config.js" defer></script>
+<script src="assets/js/aws-client.js" defer></script>
+<script src="assets/js/split.js" defer></script>
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav" aria-label="Main navigation">
+    <a class="brand" href="index.html"><span class="brand-mark">PDF</span><span>PDF Toolkit</span></a>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="index.html#tools">PDF Tools</a>
+      <a href="compress.html">Compress</a>
+      <a href="merge.html">Merge</a>
+      <a href="split.html" class="active">Split</a>
+      <a href="edit.html">Edit PDF</a>
+    </div>
+  </nav>
+</header>
+
+<section class="tool-hero">
+  <div class="wrap">
+    <a class="back-link" href="index.html">&larr; All tools</a>
+    <h1>Split PDF</h1>
+    <p>Extract every page or custom page ranges into a ZIP of PDFs.</p>
+  </div>
+</section>
+
+<main class="wrap page">
+  <div class="stack">
+
+    <section class="card" aria-labelledby="split-upload-heading">
+      <h2 id="split-upload-heading" style="margin-top:0">1. Choose your PDF</h2>
+      <label class="dropzone" id="splitDropzone">
+        <input id="splitFiles" type="file" accept=".pdf,application/pdf">
+        <div class="dz-icon" aria-hidden="true">📄</div>
+        <strong>Drag &amp; drop your PDF here</strong>
+        <p>or click to browse &middot; PDF only &middot; one file &middot; up to 100 MB</p>
+      </label>
+      <p class="merge-hint" id="splitFileName" aria-live="polite">No file selected.</p>
+
+      <h2 style="margin-bottom:8px">2. Choose how to split</h2>
+      <div role="radiogroup" aria-label="Split mode">
+        <label style="display:block;margin:8px 0">
+          <input type="radio" name="splitMode" id="splitModeAll" value="all" checked>
+          Split every page <span class="merge-hint">— one PDF per page</span>
+        </label>
+        <label style="display:block;margin:8px 0">
+          <input type="radio" name="splitMode" id="splitModeRanges" value="ranges">
+          Split by page ranges
+        </label>
+      </div>
+      <div id="splitRangesWrap" hidden>
+        <label for="splitRanges"><strong>Page ranges</strong></label>
+        <input id="splitRanges" type="text" inputmode="text" autocomplete="off"
+               placeholder="1-3, 5, 8-10" aria-describedby="splitHint"
+               style="display:block;width:100%;margin-top:6px;padding:10px">
+      </div>
+      <p class="merge-hint" id="splitHint">Select a PDF file to begin.</p>
+
+      <div class="progress" id="splitProgressWrap" hidden>
+        <div id="splitProgressFill"></div>
+      </div>
+      <div class="progress-row"><span id="splitStatus" class="status-line">Ready — select a PDF to begin.</span><span id="splitProgressPercent"></span></div>
+      <ol class="stepper" aria-label="Progress">
+        <li id="splitStepSelect">Select</li>
+        <li id="splitStepUpload">Upload</li>
+        <li id="splitStepProcess">Split</li>
+        <li id="splitStepDone">Download</li>
+      </ol>
+      <p style="margin:18px 0 0"><button class="btn block" id="splitBtn" disabled>Select a PDF to begin</button></p>
+    </section>
+
+    <section class="card result" id="splitResultCard" hidden aria-labelledby="split-result-heading" aria-live="polite">
+      <h2 id="split-result-heading" style="margin-top:0">✅ Split complete!</h2>
+      <dl>
+        <dt>Split</dt><dd id="splitResultMode">—</dd>
+        <dt>ZIP file</dt><dd id="splitResultName">—</dd>
+      </dl>
+      <p style="margin:0 0 12px"><button class="btn block" id="splitDownloadBtn">Download ZIP</button></p>
+      <p style="margin:0"><button class="btn ghost block" id="splitResetBtn">Split Another PDF</button></p>
+    </section>
+
+    <section class="card error-box" id="splitErrorCard" hidden aria-live="assertive">
+      <p id="splitErrorMessage">Something went wrong.</p>
+      <details>
+        <summary>Technical details</summary>
+        <div id="splitErrorDetails">—</div>
+      </details>
+      <p style="margin:12px 0 0"><button class="btn ghost block" id="splitRetryBtn">Try Again</button></p>
+    </section>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div>
+      <h4>PDF Toolkit</h4>
+      <p>Cloud-native PDF utilities on AWS (S3 · Lambda · Cognito).</p>
+    </div>
+    <div>
+      <h4>Tools</h4>
+      <ul>
+        <li><a href="compress.html">Compress PDF</a></li>
+        <li><a href="merge.html">Merge PDF</a></li>
+        <li><a href="split.html">Split PDF</a></li>
+        <li><a href="edit.html">Edit PDF</a></li>
+        <li><a href="index.html#tools">All tools</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Project</h4>
+      <ul>
+        <li><a href="https://github.com/bhatiadhrumil-lang/AWS-PDF-Compression-System" rel="noopener">GitHub repository</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="fineprint">Download links expire after 5 minutes. Split uses one request manifest per job so outputs never mix between users.</div>
+</footer>
+
+</body>
+</html>

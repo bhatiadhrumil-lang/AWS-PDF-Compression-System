@@ -14,6 +14,7 @@ static files on S3 website hosting.
 * [x] Multi-tool homepage (popular + all-tools grids rendered from one registry)
 * [x] Compress PDF page (drag & drop, progress, compression stats, download)
 * [x] Merge PDF page (multi-file picker + drag & drop, reorder, manifest upload, exact-output polling, download)
+* [x] Split PDF page (single-file picker + drag & drop, every-page / ranges modes, manifest upload, exact-ZIP polling, download) — implemented + tested, NOT deployed
 * [x] S3 upload via Cognito unauthenticated credentials (preserved behavior)
 * [x] AWS Lambda processing status polling (preserved behavior)
 * [x] S3 output presigned-URL download, 5-minute expiry (preserved behavior)
@@ -21,7 +22,6 @@ static files on S3 website hosting.
 * [x] Friendly errors with expandable technical details
 * [x] Editor + future-tool placeholder pages (honest “Coming soon”, no fake processing)
 * [ ] Edit PDF
-* [ ] Split PDF
 * [ ] Rotate PDF
 * [ ] Delete Pages
 * [ ] Extract Pages
@@ -143,6 +143,33 @@ Status:
 * Output handling: the frontend polls HeadObject for the EXACT key
   `merged-<id>.pdf` (same 5 s / ~2 min pattern as compression) — never “any
   `merged-*.pdf`” — then downloads via the existing 5-minute presigned URL.
+
+### Split PDF
+
+Status:
+
+* Backend: Implemented + local/docker-tested, **NOT deployed** (no
+  `.split.json` trigger yet; Lambda still runs the pre-split image).
+* Frontend: Implemented + statically tested, **NOT deployed** (live site
+  still serves the pre-split pages).
+
+* Single-file upload: picker + drag & drop, PDF extension + 100 MB checked
+  before upload; only the first file is kept if several are dropped.
+* Modes: “Split every page” or “Split by page ranges” with a `1-3, 5, 8-10`
+  textbox. Client validation mirrors the backend parser (singles, spans,
+  whitespace tolerated; rejects 0, reversed, malformed, empty, duplicate and
+  overlapping ranges, and more than 50 ranges). Page-count bounds are left to
+  the backend, which knows the PDF.
+* Manifest architecture: one `crypto.randomUUID()` request id per job; the
+  PDF goes to `uploads/<id>/<safe>.pdf`, then the manifest
+  `split-requests/<id>.split.json` is uploaded LAST (single Lambda trigger):
+  `{ "operation": "split", "input": ..., "mode": "all" | "ranges",
+  "ranges": [...], "output_name": "<safe>.pdf" }` (`ranges` omitted for
+  `"all"`). A failed PDF upload rejects the chain, so the manifest is never
+  sent.
+* Output handling: the frontend polls HeadObject for the EXACT key
+  `split/<id>/<stem>-split.zip` (same polling pattern) — then a single
+  “Download ZIP” button uses the existing 5-minute presigned URL mechanism.
 
 ## Deployment
 

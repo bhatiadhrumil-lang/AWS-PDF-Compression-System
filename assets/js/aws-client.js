@@ -367,6 +367,145 @@ window.PdfCloud = (function () {
     return "Something went wrong. Please try again.";
   }
 
+  /* ---------------- Split PDF helpers (additive; merge/compress untouched) ---
+   *
+   * Backend split contract (see backend repo README, reference only):
+   *   input:   "uploads/<request-id>/<safe>.pdf" (same INPUT bucket)
+   *   manifest:"split-requests/<request-id>.split.json" (uploaded AFTER pdf)
+   *     { "operation": "split", "input": ..., "mode": "all" | "ranges",
+   *       "ranges": ["1-3", "5"], "output_name": "<safe>.pdf" }
+   *   output:  "split/<request-id>/<stem>-split.zip" (flat ZIP, exact poll)
+   *
+   * The manifest is the Lambda trigger and MUST be uploaded only after the
+   * PDF upload has succeeded (see split.js sequencing).
+   */
+
+  function newSplitRequestId() {
+    return newMergeRequestId();
+  }
+
+  /* Full input key for the split source PDF. */
+  function splitInputKey(requestId, safeBaseName) {
+    return "uploads/" + String(requestId) + "/" + String(safeBaseName);
+  }
+
+  function splitManifestKey(requestId) {
+    return cfg.SPLIT_MANIFEST_PREFIX + String(requestId) + cfg.SPLIT_MANIFEST_SUFFIX;
+  }
+
+  /* Mirror of backend sanitize_split_stem: drop directories, strip control
+   * chars, remove a trailing .pdf/.zip, keep spaces/parens/unicode. */
+  function sanitizeSplitStem(name, fallbackId) {
+    var raw = String(name || "");
+    raw = raw.split("/").pop().split("\\").pop().trim();
+    // eslint-disable-next-line no-control-regex
+    raw = raw.replace(/[\x00-\x1f\x7f]/g, "").trim();
+    raw = raw.replace(/\.+$/, "");
+    if (/\.zip$/i.test(raw)) raw = raw.slice(0, -4).replace(/\.+$/, "").trim();
+    else if (/\.pdf$/i.test(raw)) raw = raw.slice(0, -4).replace(/\.+$/, "").trim();
+    if (!raw) raw = String(fallbackId || "document");
+    return raw.slice(0, 200);
+  }
+
+  /* Deterministic output key: "split/<id>/<stem>-split.zip". The backend
+   * derives the identical key, so the page polls this EXACT object. */
+  function expectedSplitOutputKey(requestId, outputName) {
+    var id = String(requestId);
+    var stem = sanitizeSplitStem(outputName, id);
+    return cfg.SPLIT_OUTPUT_DIR + "/" + id + "/" + stem + "-split.zip";
+  }
+
+  /* Pure manifest builder. Ranges mode carries the token list in order;
+   * "all" mode carries no ranges (backend rejects ranges with mode all). */
+  function buildSplitManifest(requestId, inputKey, mode, ranges, outputName) {
+    var manifest = {
+      operation: "split",
+      input: inputKey,
+      mode: mode === "ranges" ? "ranges" : "all",
+      output_name: outputName || (String(requestId) + ".pdf")
+    };
+    if (manifest.mode === "ranges") {
+      manifest.ranges = (ranges || []).slice();
+    }
+    return manifest;
+  }
+
+  /* Pure page-range parser over the ranges textbox. Returns
+   * { ok, ranges[], error }. Syntax only ("5", "1-3", comma-separated);
+   * page-count bounds are enforced by the backend, which knows the PDF. */
+  function parseSplitRanges(text) {
+    var max = cfg.SPLIT_MAX_RANGES || 50;
+    var raw = String(text || "");
+    var pieces = raw.split(",");
+    var tokens = [];
+    for (var k = 0; k < pieces.length; k++) {
+      var trimmed = pieces[k].trim();
+      if (!trimmed) {
+        return { ok: false, ranges: [], error: "There is an empty range — check for stray commas (e.g. “1,,2”)." };
+      }
+      tokens.push(trimmed);
+    }
+    if (!tokens.length) {
+      return { ok: false, ranges: [], error: "Enter at least one page range, e.g. 1-3, 5, 8-10." };
+    }
+    if (tokens.length > max) {
+      return { ok: false, ranges: [], error: "You can request up to " + max + " ranges at a time." };
+    }
+    var seen = {};
+    var spans = [];
+    for (var i = 0; i < tokens.length; i++) {
+      var single = /^\d+$/.exec(tokens[i]);
+      var span = /^(\d+)\s*-\s*(\d+)$/.exec(tokens[i]);
+      var start = 0, end = 0;
+      if (single) {
+        start = end = parseInt(single[0], 10);
+      } else if (span) {
+        start = parseInt(span[1], 10);
+        end = parseInt(span[2], 10);
+      } else {
+        return { ok: false, ranges: [], error: "“" + tokens[i] + "” is not a valid range. Use a page like 5 or a span like 1-3." };
+      }
+      if (start < 1 || end < 1) {
+        return { ok: false, ranges: [], error: "“" + tokens[i] + "” is not valid — pages start at 1." };
+      }
+      if (start > end) {
+        return { ok: false, ranges: [], error: "“" + tokens[i] + "” is reversed — the first page must come first." };
+      }
+      var key = start + "-" + end;
+      if (seen[key]) {
+        return { ok: false, ranges: [], error: "“" + tokens[i] + "” is listed twice — each range may appear once." };
+      }
+      for (var j = 0; j < spans.length; j++) {
+        if (start <= spans[j][1] && spans[j][0] <= end) {
+          return { ok: false, ranges: [], error: "“" + tokens[i] + "” overlaps an earlier range — each page may appear once." };
+        }
+      }
+      seen[key] = true;
+      spans.push([start, end]);
+    }
+    return { ok: true, ranges: tokens, error: "" };
+  }
+
+  /* Upload the split manifest (final trigger — call only after the PDF
+   * upload succeeded). Resolves with the manifest key. */
+  function putSplitManifest(requestId, manifestObj) {
+    var key = splitManifestKey(requestId);
+    var body = JSON.stringify(manifestObj);
+    return ensureCredentials().then(function () {
+      return new Promise(function (resolve, reject) {
+        s3.putObject({
+          Bucket: cfg.INPUT_BUCKET,
+          Key: key,
+          Body: body,
+          ContentType: "application/json"
+        }, function (err) {
+          if (err) reject(err);
+          else resolve(key);
+        });
+      });
+    });
+  }
+
   function technicalDetails(err) {
     if (!err) return "No technical details available.";
     var code = err.code || err.name || "UnknownError";
@@ -400,6 +539,14 @@ window.PdfCloud = (function () {
     uploadMergePdf: uploadMergePdf,
     putMergeManifest: putMergeManifest,
     pollForExactOutput: pollForExactOutput,
+    newSplitRequestId: newSplitRequestId,
+    splitInputKey: splitInputKey,
+    splitManifestKey: splitManifestKey,
+    sanitizeSplitStem: sanitizeSplitStem,
+    expectedSplitOutputKey: expectedSplitOutputKey,
+    buildSplitManifest: buildSplitManifest,
+    parseSplitRanges: parseSplitRanges,
+    putSplitManifest: putSplitManifest,
     friendlyError: friendlyError,
     technicalDetails: technicalDetails,
     formatBytes: formatBytes
