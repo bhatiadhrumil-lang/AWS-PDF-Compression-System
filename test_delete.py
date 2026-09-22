@@ -194,7 +194,8 @@ class DeletePageTests(unittest.TestCase):
         self.assertIn('DELETE_MANIFEST_SUFFIX', AWS_JS)
 
     def test_12_download_via_presigned_url(self):
-        self.assertIn("downloadOutput(lastOutputKey)", DELETE_JS)
+        self.assertIn("downloadOutput(lastOutputKey,", DELETE_JS)
+        self.assertIn('$("deleteResultName").textContent', DELETE_JS)
         self.assertIn("Download PDF", DELETE_HTML)
 
     def test_13_stem_sanitization(self):

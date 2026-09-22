@@ -190,7 +190,8 @@ class RotatePageTests(unittest.TestCase):
         self.assertIn('ROTATE_MANIFEST_SUFFIX', AWS_JS)
 
     def test_14_download_via_presigned_url(self):
-        self.assertIn("downloadOutput(lastOutputKey)", ROTATE_JS)
+        self.assertIn("downloadOutput(lastOutputKey,", ROTATE_JS)
+        self.assertIn('$("rotateResultName").textContent', ROTATE_JS)
         self.assertIn("Download rotated PDF", ROTATE_HTML)
 
     def test_15_stem_sanitization(self):

@@ -158,7 +158,9 @@
   function download() {
     if (!lastOutputKey) return;
     try {
-      window.PdfCloud.downloadOutput(lastOutputKey);
+      // Keep the user's original filename in the save dialog.
+      window.PdfCloud.downloadOutput(
+        lastOutputKey, "compressed-" + selectedFile.name);
     } catch (err) {
       showError(err, "download");
     }

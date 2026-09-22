@@ -20,7 +20,9 @@ static files on S3 website hosting.
 * [x] S3 upload via Cognito unauthenticated credentials (preserved behavior)
 * [x] AWS Lambda processing status polling (preserved behavior)
 * [x] S3 output presigned-URL download, 5-minute expiry (preserved behavior)
-* [x] Filename-safe S3 keys (UI shows the original name; storage key normalized)
+* [x] Filename-safe S3 keys (original basename preserved: spaces, parens,
+  `#`, `+`, `&`, `%`, unicode; only path separators/controls neutralized,
+  `.pdf` lowercased for the trigger filter; unique namespace per upload)
 * [x] Friendly errors with expandable technical details
 * [x] Editor + future-tool placeholder pages (honest “Coming soon”, no fake processing)
 * [ ] Edit PDF
@@ -77,20 +79,27 @@ secrets — no passwords, access keys, or private keys exist in this repo.
 
 ### Filename coordination with the backend
 
-The Lambda backend reads the S3 event key raw and writes
-`compressed-<basename(key)>`; S3 event keys are URL-encoded. So upload keys
-must avoid spaces, parentheses, brackets, `+`, `&`, `%`, and unicode —
-otherwise compression silently never produces output.
+Upload keys PRESERVE the user's original basename — `My Report (Final).pdf`,
+`Report #1.pdf`, `Report+Final.pdf`, `Report & Data.pdf`, `100% done.pdf`,
+and unicode names all travel to S3 verbatim, namespaced for uniqueness
+(`uploads/<unique-id>_<original-base>.pdf` for compress,
+`uploads/<request-id>/<original-base>.pdf` for the tools). Only path
+separators (`/`, `\`) and control characters are neutralized, and `.pdf` is
+lowercased so the bucket's case-sensitive trigger always fires. The backend
+URL-decodes S3 event keys, treats manifest keys verbatim (decoding those
+used to corrupt real `+` characters — fixed), and preserves basenames in
+output keys, so `compressed-My Report.pdf` is exactly what comes back.
 
-`PdfCloud.sanitizeS3Key()` enforces this: it maps any filename to
-`uploads/<unique-id>_<safe-base>.pdf` (`[A-Za-z0-9._-]` only, extension
-lowercased so the bucket’s case-sensitive `.pdf` trigger always fires, unique
-prefix so concurrent uploads can’t overwrite each other). The UI always
-displays the **original** filename exactly as-is. Examples:
-
-* `My Report.pdf` → shown as-is, stored safely
-* `My Important Report (Final).pdf` → shown as-is, stored safely
-* `Invoice [September].PDF` → shown as-is, stored with lowercase `.pdf`
+Root cause of the original issue: the frontend used to map every
+non-`[A-Za-z0-9._-]` character to `_`, destroying original filenames
+(`My Report.pdf` → `My_Report.pdf`). That mangling was unnecessary — S3,
+Lambda/boto3, Ghostscript (list-args invocation), and presigned URLs all
+handle these characters — so it was removed. Downloads additionally carry
+`ResponseContentDisposition` (`filename` + RFC 5987 `filename*`) so the
+browser save dialog shows a friendly original-derived name. Verified live:
+all seven problem filenames plus `%`/unicode compress end-to-end (browser
+and CLI), including a `#` download; a `+` merge that 404'd before the
+backend fix succeeds after it.
 
 ## Error handling
 

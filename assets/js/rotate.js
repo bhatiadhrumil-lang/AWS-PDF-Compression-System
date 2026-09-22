@@ -246,7 +246,8 @@
     if (!lastOutputKey) return;
     try {
       setStatus("Preparing download…");
-      window.PdfCloud.downloadOutput(lastOutputKey);
+      var name = $("rotateResultName").textContent;
+      window.PdfCloud.downloadOutput(lastOutputKey, name || undefined);
       setStatus("Complete — your rotated PDF is ready below.");
     } catch (err) {
       showAwsError(err, "download");

@@ -204,7 +204,8 @@ class SplitPageTests(unittest.TestCase):
         self.assertIn('SPLIT_MANIFEST_SUFFIX', AWS_JS)
 
     def test_12_zip_download_via_presigned_url(self):
-        self.assertIn("downloadOutput(lastOutputKey)", SPLIT_JS)
+        self.assertIn("downloadOutput(lastOutputKey,", SPLIT_JS)
+        self.assertIn('$("splitResultName").textContent', SPLIT_JS)
         self.assertIn("Download ZIP", SPLIT_HTML)
 
     def test_13_stem_sanitization(self):

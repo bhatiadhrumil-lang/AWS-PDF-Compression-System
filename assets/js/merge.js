@@ -445,7 +445,8 @@
     if (!lastOutputKey) return;
     try {
       setStatus("Preparing download…");
-      window.PdfCloud.downloadOutput(lastOutputKey);
+      var name = $("mergeResultName").textContent;
+      window.PdfCloud.downloadOutput(lastOutputKey, name || undefined);
       setStatus("Complete — your merged PDF is ready below.");
     } catch (err) {
       showAwsError(err, "download");

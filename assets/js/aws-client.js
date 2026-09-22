@@ -5,11 +5,15 @@
  *   (ContentType application/pdf) -> credential refresh ->
  *   HeadObject polling on OUTPUT bucket -> presigned GET URL (300s) -> new tab.
  *
- * Hard rule coordinated with the Lambda backend (src/app.py in the backend
- * repo): the backend reads the S3 event key raw and writes
- * "compressed-<basename(key)>". S3 event keys are URL-encoded, so upload
- * keys MUST use only S3-safe characters. The UI always displays the
- * ORIGINAL filename; only the S3 object key is sanitized.
+ * Filename contract (coordinated with the Lambda backend):
+ *   Upload keys PRESERVE the user's original basename (spaces, parentheses,
+ *   "#", "+", "&", "%", unicode, ...) namespaced under a unique prefix, so
+ *   concurrent uploads never collide. Only true path separators ("/", "\")
+ *   and control characters are neutralized; the ".pdf" extension is
+ *   normalized to lowercase because the bucket trigger suffix filter is
+ *   case-sensitive. The backend URL-decodes S3 event keys, treats manifest
+ *   keys verbatim, and preserves basenames in output keys, so what the user
+ *   picked is what comes back. The UI always displays the ORIGINAL filename.
  */
 window.PdfCloud = (function () {
   var cfg = window.PdfConfig;
@@ -44,32 +48,36 @@ window.PdfCloud = (function () {
     });
   }
 
-  /* Map any filename to an S3-safe object key.
-   * Keeps [A-Za-z0-9._-], replaces everything else (spaces, parentheses,
-   * brackets, +, &, %, unicode, ...) with "_", normalizes the extension to
-   * lowercase ".pdf" (the bucket trigger suffix filter is case-sensitive),
-   * and prefixes a unique id so concurrent uploads never overwrite each
-   * other in the shared bucket. */
-  function sanitizeS3Key(originalName) {
+  /* Map any filename to an upload-safe basename that still reads like the
+   * original: keeps spaces, parentheses, brackets, "#", "+", "&", "%", "=",
+   * unicode, etc. Neutralizes only what would break key structure or URLs:
+   * path separators ("/", "\") and control characters. Normalizes the
+   * extension to lowercase ".pdf" (the bucket trigger suffix filter is
+   * case-sensitive). Caps length and falls back to "document" when nothing
+   * usable remains. */
+  function readableBase(originalName) {
     var name = String(originalName || "document.pdf");
+    name = name.split("/").pop().split("\\").pop();
     var dot = name.lastIndexOf(".");
     var base = dot > 0 ? name.slice(0, dot) : name;
     var ext = dot > 0 ? name.slice(dot).toLowerCase() : "";
     if (ext !== ".pdf") ext = ".pdf";
-    try {
-      base = base.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
-    } catch (e) { /* older browsers: keep base as-is */ }
-    base = base
-      .replace(/[^A-Za-z0-9._-]+/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^[_.]+|[_.]+$/g, "");
+    // eslint-disable-next-line no-control-regex
+    base = base.replace(/[\x00-\x1f\x7f]/g, "");
+    base = base.replace(/[\/\\]+/g, "_");
+    base = base.replace(/^\.+|\.+$/g, "");
     if (!base) base = "document";
-    base = base.slice(0, 120);
+    return base.slice(0, 120) + ext;
+  }
+
+  /* Compress upload key: unique prefix (collision safety in the shared
+   * bucket) + the original readable basename. */
+  function sanitizeS3Key(originalName) {
     var uniq =
       Date.now().toString(36) +
       "-" +
       Math.random().toString(36).slice(2, 8);
-    return "uploads/" + uniq + "_" + base + ext;
+    return "uploads/" + uniq + "_" + readableBase(originalName);
   }
 
   /* Backend naming contract: output key = "compressed-" + basename(input key). */
@@ -164,13 +172,29 @@ window.PdfCloud = (function () {
     });
   }
 
-  function downloadOutput(outputKey) {
+  /* Content-Disposition for a download filename: ASCII fallback plus an
+   * RFC 5987 UTF-8* value, so spaces, "#", "&", "%", and unicode survive
+   * the browser save dialog. Returns undefined when there is no usable name
+   * (caller then omits the parameter entirely). */
+  function contentDisposition(filename) {
+    // Note: '"' is written as \x22 so naive static checks keep working.
+    var name = String(filename || "").replace(/[\x00-\x1f\x7f\x22]/g, "_").trim();
+    if (!name) return undefined;
+    var ascii = name.replace(/[^\x20-\x7e]/g, "_") || "download.pdf";
+    return "attachment; filename=\"" + ascii + "\"; filename*=UTF-8''" +
+      encodeURIComponent(name);
+  }
+
+  function downloadOutput(outputKey, downloadName) {
     var out = new AWS.S3({ region: cfg.REGION });
-    var url = out.getSignedUrl("getObject", {
+    var params = {
       Bucket: cfg.OUTPUT_BUCKET,
       Key: outputKey,
       Expires: cfg.DOWNLOAD_URL_EXPIRES_S
-    });
+    };
+    var disposition = downloadName ? contentDisposition(downloadName) : undefined;
+    if (disposition) params.ResponseContentDisposition = disposition;
+    var url = out.getSignedUrl("getObject", params);
     window.open(url, "_blank", "noopener");
   }
 
@@ -206,23 +230,10 @@ window.PdfCloud = (function () {
     return "merge-" + Date.now().toString(36) + "-" + String(rand).slice(0, 12);
   }
 
-  /* S3-safe basename for one merge input (mirrors sanitizeS3Key rules but
+  /* Readable basename for one tool input (same rules as sanitizeS3Key but
    * without the unique prefix — the request id already namespaces inputs). */
   function sanitizeMergeBase(originalName) {
-    var name = String(originalName || "document.pdf");
-    var dot = name.lastIndexOf(".");
-    var base = dot > 0 ? name.slice(0, dot) : name;
-    var ext = dot > 0 ? name.slice(dot).toLowerCase() : "";
-    if (ext !== ".pdf") ext = ".pdf";
-    try {
-      base = base.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
-    } catch (e) { /* older browsers: keep base as-is */ }
-    base = base
-      .replace(/[^A-Za-z0-9._-]+/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^[_.]+|[_.]+$/g, "");
-    if (!base) base = "document";
-    return base.slice(0, 120) + ext;
+    return readableBase(originalName);
   }
 
   /* Full input key for one merge file: uploads/<request-id>/<safe-base>.
@@ -678,7 +689,9 @@ window.PdfCloud = (function () {
 
   return {
     init: init,
+    readableBase: readableBase,
     sanitizeS3Key: sanitizeS3Key,
+    contentDisposition: contentDisposition,
     outputKeyFor: outputKeyFor,
     validatePdfFile: validatePdfFile,
     uploadPdf: uploadPdf,
