@@ -11,6 +11,15 @@ window.PdfConfig = {
   MAX_FILE_SIZE_MB: 100,
   ALLOWED_EXTENSIONS: ["pdf"],
 
+  /* Merge PDF guardrails (mirror backend defaults; client-side only). */
+  MERGE_MIN_FILES: 2,
+  MERGE_MAX_FILES: 20,
+  MERGE_MAX_TOTAL_MB: 200,
+  MERGE_MANIFEST_PREFIX: "merge-requests/",
+  MERGE_MANIFEST_SUFFIX: ".merge.json",
+  MERGE_OUTPUT_PREFIX: "merged-",
+  MERGE_INPUT_PREFIX: "uploads/",
+
   /* Output polling: every 5s, up to ~2 minutes (matches Lambda timeout budget). */
   POLL_INTERVAL_MS: 5000,
   POLL_MAX_ATTEMPTS: 24,

@@ -29,9 +29,9 @@ window.PdfTools = [
     title: "Merge PDF",
     description: "Combine multiple PDF files into one document.",
     icon: "merge",
-    status: "soon",
-    href: "tool.html?tool=merge",
-    badge: "Coming soon"
+    status: "available",
+    href: "merge.html",
+    badge: "Available"
   },
   {
     id: "split",

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Merge multiple PDF files into one document — combine PDFs in order. Powered by AWS.">
+<title>Merge PDF — PDF Toolkit</title>
+<link rel="stylesheet" href="assets/css/styles.css">
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js" defer></script>
+<script src="assets/js/config.js" defer></script>
+<script src="assets/js/aws-client.js" defer></script>
+<script src="assets/js/merge.js" defer></script>
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav" aria-label="Main navigation">
+    <a class="brand" href="index.html"><span class="brand-mark">PDF</span><span>PDF Toolkit</span></a>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="index.html#tools">PDF Tools</a>
+      <a href="compress.html">Compress</a>
+      <a href="merge.html" class="active">Merge</a>
+      <a href="edit.html">Edit PDF</a>
+    </div>
+  </nav>
+</header>
+
+<section class="tool-hero">
+  <div class="wrap">
+    <a class="back-link" href="index.html">&larr; All tools</a>
+    <h1>Merge PDF</h1>
+    <p>Combine multiple PDF files into one document.</p>
+  </div>
+</section>
+
+<main class="wrap page">
+  <div class="stack">
+
+    <section class="card" aria-labelledby="merge-upload-heading">
+      <h2 id="merge-upload-heading" style="margin-top:0">1. Choose your PDFs</h2>
+      <label class="dropzone" id="mergeDropzone">
+        <input id="mergeFiles" type="file" accept=".pdf,application/pdf" multiple>
+        <div class="dz-icon" aria-hidden="true">📄</div>
+        <strong>Drag &amp; drop your PDFs here</strong>
+        <p>or click to browse &middot; PDF only &middot; 2–20 files &middot; up to 100 MB each &middot; 200 MB total</p>
+      </label>
+      <p style="margin:12px 0 0"><button class="btn ghost block" id="addMoreBtn" type="button">+ Add more PDFs</button></p>
+      <input id="mergeFilesMore" type="file" accept=".pdf,application/pdf" multiple hidden>
+
+      <div class="merge-totals" aria-live="polite">
+        <span id="mergeCount">Files: 0 / 20</span>
+        <span id="mergeTotalSize">Total size: 0 B / 200 MB</span>
+      </div>
+
+      <ol class="merge-list" id="mergeList" aria-label="Selected PDFs in merge order"></ol>
+      <p class="merge-hint" id="mergeHint">Select at least 2 PDF files to begin. Drag items to reorder, or use the up/down buttons.</p>
+
+      <div class="progress" id="mergeProgressWrap" hidden>
+        <div id="mergeProgressFill"></div>
+      </div>
+      <div class="progress-row"><span id="mergeStatus" class="status-line">Ready — select at least 2 PDFs to begin.</span><span id="mergeProgressPercent"></span></div>
+      <ol class="stepper" aria-label="Progress">
+        <li id="mergeStepSelect">Select</li>
+        <li id="mergeStepUpload">Upload</li>
+        <li id="mergeStepProcess">Merge</li>
+        <li id="mergeStepDone">Download</li>
+      </ol>
+      <p style="margin:18px 0 0"><button class="btn block" id="mergeBtn" disabled>Select at least 2 PDFs</button></p>
+    </section>
+
+    <section class="card result" id="mergeResultCard" hidden aria-labelledby="merge-result-heading" aria-live="polite">
+      <h2 id="merge-result-heading" style="margin-top:0">✅ Merge complete!</h2>
+      <dl>
+        <dt>Original files</dt><dd id="mergeResultCount">—</dd>
+        <dt>Total input size</dt><dd id="mergeResultSize">—</dd>
+        <dt>Merged file</dt><dd id="mergeResultName">—</dd>
+      </dl>
+      <p style="margin:0 0 12px"><button class="btn block" id="mergeDownloadBtn">Download merged PDF</button></p>
+      <p style="margin:0"><button class="btn ghost block" id="mergeResetBtn">Merge More PDFs</button></p>
+    </section>
+
+    <section class="card error-box" id="mergeErrorCard" hidden aria-live="assertive">
+      <p id="mergeErrorMessage">Something went wrong.</p>
+      <details>
+        <summary>Technical details</summary>
+        <div id="mergeErrorDetails">—</div>
+      </details>
+      <p style="margin:12px 0 0"><button class="btn ghost block" id="mergeRetryBtn">Try Again</button></p>
+    </section>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div>
+      <h4>PDF Toolkit</h4>
+      <p>Cloud-native PDF utilities on AWS (S3 · Lambda · Cognito).</p>
+    </div>
+    <div>
+      <h4>Tools</h4>
+      <ul>
+        <li><a href="compress.html">Compress PDF</a></li>
+        <li><a href="merge.html">Merge PDF</a></li>
+        <li><a href="edit.html">Edit PDF</a></li>
+        <li><a href="index.html#tools">All tools</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Project</h4>
+      <ul>
+        <li><a href="https://github.com/bhatiadhrumil-lang/AWS-PDF-Compression-System" rel="noopener">GitHub repository</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="fineprint">Download links expire after 5 minutes. Merge uses one request manifest per job so outputs never mix between users.</div>
+</footer>
+
+</body>
+</html>

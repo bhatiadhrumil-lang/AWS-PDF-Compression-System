@@ -27,10 +27,11 @@ def ok(msg):
     print("ok:", msg)
 
 
-HTML_FILES = ["index.html", "compress.html", "edit.html", "tool.html"]
+HTML_FILES = ["index.html", "compress.html", "merge.html", "edit.html", "tool.html"]
 JS_BY_PAGE = {
     "index.html": ["assets/js/config.js", "assets/js/tools.js", "assets/js/home.js"],
     "compress.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/compress.js"],
+    "merge.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/merge.js"],
     "edit.html": [],
     "tool.html": ["assets/js/tools.js", "assets/js/tool.js"],
 }
@@ -43,14 +44,17 @@ for page, scripts in JS_BY_PAGE.items():
         js = (ROOT / script).read_text(encoding="utf-8")
         refs = set(re.findall(r'(?:getElementById|\$\()\s*["\']([^"\']+)["\']', js))
         # compress.js builds stepper ids dynamically ("step"+Capitalized),
-        # so any ref starting with "step" is resolved against the HTML below.
-        missing = {r for r in refs if r not in defined and not r.startswith("step")}
+        # merge.js builds "mergeStep"+Capitalized — both resolved below.
+        missing = {r for r in refs if r not in defined and not r.startswith("step") and not r.startswith("mergeStep") and r != "mergeStep"}
         # resolve dynamic stepper ids explicitly
         dyn_ok = all(("step" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
+        merge_dyn_ok = all(("mergeStep" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
         if missing:
             fail(f"{page} <- {script}: missing ids {sorted(missing)}")
         elif script == "assets/js/compress.js" and not dyn_ok:
             fail(f"{page}: dynamic stepper ids missing")
+        elif script == "assets/js/merge.js" and not merge_dyn_ok:
+            fail(f"{page}: dynamic merge stepper ids missing")
         else:
             ok(f"{page} <- {script}: ids resolve")
 

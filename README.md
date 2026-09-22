@@ -13,6 +13,7 @@ static files on S3 website hosting.
 
 * [x] Multi-tool homepage (popular + all-tools grids rendered from one registry)
 * [x] Compress PDF page (drag & drop, progress, compression stats, download)
+* [x] Merge PDF page (multi-file picker + drag & drop, reorder, manifest upload, exact-output polling, download)
 * [x] S3 upload via Cognito unauthenticated credentials (preserved behavior)
 * [x] AWS Lambda processing status polling (preserved behavior)
 * [x] S3 output presigned-URL download, 5-minute expiry (preserved behavior)
@@ -20,7 +21,6 @@ static files on S3 website hosting.
 * [x] Friendly errors with expandable technical details
 * [x] Editor + future-tool placeholder pages (honest “Coming soon”, no fake processing)
 * [ ] Edit PDF
-* [ ] Merge PDF
 * [ ] Split PDF
 * [ ] Rotate PDF
 * [ ] Delete Pages
@@ -43,14 +43,16 @@ when the interactive PDF editor lands (it will need canvas rendering).
 ```text
 index.html            homepage: hero, popular tools, all tools, how-it-works
 compress.html         dedicated compressor page (the working tool)
+merge.html            merge page (multi-file select, reorder, progress, download)
 edit.html             editor placeholder (planned features, coming soon)
 tool.html?tool=<id>  generic placeholder for every other future tool
 assets/css/styles.css shared stylesheet (responsive, mobile-first)
 assets/js/config.js   public AWS identifiers + tunable limits (no secrets)
 assets/js/tools.js    tool registry + icon set (single source of truth)
-assets/js/aws-client.js Cognito/S3 service: upload, poll, download, errors
+assets/js/aws-client.js Cognito/S3 service: upload, poll, download, errors (+ merge helpers)
 assets/js/home.js     renders tool cards on the homepage
 assets/js/compress.js compressor page flow
+assets/js/merge.js    merge page flow (validate, reorder, ordered uploads, manifest, poll)
 assets/js/tool.js     renders generic placeholders from the registry
 ```
 
@@ -103,13 +105,47 @@ placeholder ids, AWS SDK load failure.
 python3 -m http.server 8000
 # open http://localhost:8000/
 python3 checks.py   # static validation (ids, links, registry, no secrets)
+python3 test_merge.py  # merge frontend tests (validation, manifest, ordering, no AWS)
 ```
 
 `checks.py` verifies: every element id referenced in JS exists in its HTML,
 every local link/script/stylesheet target exists, every registry `href`
 resolves, no AWS secret patterns are committed, and the SDK version is pinned
-consistently. There is no automated browser test suite; validation is static
-plus manual walkthrough (see commit message / PR notes).
+consistently. `test_merge.py` covers the merge page (multi-select, 2–20 and
+100 MB / 200 MB limits, remove/reorder, manifest order + operation + keys,
+unique request ids, manifest-after-uploads sequencing, exact-output polling)
+plus a compression regression check. There is no automated browser test suite;
+validation is static plus manual walkthrough (see commit message / PR notes).
+
+### Merge PDF
+
+Status:
+
+* Backend: Implemented
+* Frontend: Implemented
+* AWS Deployment: Pending
+
+The merge backend exists in the backend repository but its Lambda trigger
+(`.merge.json` suffix notification) has NOT been deployed yet, so end-to-end
+merging will start working only after that deployment. No S3 deployment was
+done from this change.
+
+* Multi-file upload: picker (multiple) + drag & drop, “+ Add more PDFs”
+  appends without resetting the list.
+* Ordering: list shows position number + PDF icon + name + size + remove;
+  HTML5 drag-and-drop reordering plus accessible ↑ / ↓ buttons. The manifest
+  `inputs` array is built from the UI order and never re-sorted.
+* Limits (enforced before upload): 2–20 files, 100 MB per file, 200 MB total,
+  PDF extension required. Friendly messages; raw AWS errors stay in
+  “Technical details”.
+* Manifest architecture: one `crypto.randomUUID()` request id per job; PDFs go
+  to `uploads/<id>/<safe>.pdf` in order, then the manifest
+  `merge-requests/<id>.merge.json` is uploaded LAST (single Lambda trigger):
+  `{ "operation": "merge", "inputs": [...], "output_name": "<id>.pdf" }`.
+  A failed PDF upload rejects the chain, so the manifest is never sent.
+* Output handling: the frontend polls HeadObject for the EXACT key
+  `merged-<id>.pdf` (same 5 s / ~2 min pattern as compression) — never “any
+  `merged-*.pdf`” — then downloads via the existing 5-minute presigned URL.
 
 ## Deployment
 

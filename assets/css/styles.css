@@ -188,6 +188,42 @@ a.tool-card:hover { transform: translateY(-3px); border-color: var(--brand); box
 .feature-list { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); padding: 0; margin: 16px 0 0; list-style: none; }
 .feature-list li { background: #fafbff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-size: 0.92rem; }
 
+/* merge file list */
+.merge-totals {
+  display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+  margin: 14px 0 8px; font-size: 0.88rem; font-weight: 700; color: var(--muted);
+}
+.merge-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.merge-item {
+  display: flex; align-items: center; gap: 10px;
+  background: #fafbff; border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 12px;
+}
+.merge-item.dragging { opacity: 0.5; border-color: var(--brand); }
+.merge-pos {
+  flex: 0 0 28px; height: 28px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--brand-soft); color: var(--brand-dark);
+  font-weight: 800; font-size: 0.85rem;
+}
+.merge-icon { font-size: 1.3rem; }
+.merge-meta { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.merge-name {
+  font-weight: 700; font-size: 0.92rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.merge-size { font-size: 0.8rem; color: var(--muted); }
+.merge-controls { display: flex; gap: 6px; flex: 0 0 auto; }
+.mini-btn {
+  border: 1px solid var(--line); background: #fff; color: var(--ink);
+  border-radius: 8px; min-width: 34px; height: 34px; padding: 0 8px;
+  font-weight: 800; cursor: pointer; font-size: 0.95rem;
+}
+.mini-btn:hover:not(:disabled) { border-color: var(--brand); color: var(--brand-dark); }
+.mini-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.mini-btn.danger { color: var(--danger); }
+.merge-hint { font-size: 0.85rem; color: var(--muted); }
+
 /* ---------- footer ---------- */
 .site-footer { border-top: 1px solid var(--line); background: var(--surface); margin-top: 64px; }
 .footer-grid { display: grid; gap: 24px; grid-template-columns: 2fr 1fr 1fr; padding: 36px 20px; max-width: 1120px; margin: 0 auto; }
