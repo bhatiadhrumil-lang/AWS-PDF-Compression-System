@@ -1,0 +1,41 @@
+# AWS CodeBuild buildspec — PDF Toolkit Frontend (static website).
+#
+# Pipeline design:
+#   GitHub (main) -> CodePipeline -> CodeBuild (this file) -> validation ->
+#   [later: S3 sync to pdf-compressor-website-868942372673, no --delete]
+#
+# Project requirements (set on the CodeBuild project, not here):
+#   * Linux image: aws/codebuild/amazonlinux2-x86_64-standard:5.0 (Python 3.x
+#     is all this build needs; privileged mode NOT required).
+#   * No AWS credentials needed (all checks are static, no network calls).
+#
+# This buildspec deliberately does NOT upload anything to S3.
+# Website deployment stays manual until the pipeline's deploy stage is approved.
+#
+# NOTE: there is no single test_merge_split_rotate_delete.py in this repo;
+# validation is checks.py plus test_merge.py, test_split.py, test_rotate.py,
+# test_delete.py, and test_filenames.py — all are run below.
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.11
+    commands:
+      - python3 --version
+
+  build:
+    commands:
+      - echo "Running frontend static checks..."
+      - python3 checks.py
+      - echo "Running frontend test suites..."
+      - python3 test_merge.py
+      - python3 test_split.py
+      - python3 test_rotate.py
+      - python3 test_delete.py
+      - python3 test_filenames.py
+      - echo "All frontend validation passed."
+
+  post_build:
+    commands:
+      - echo "Frontend CI build complete. No S3 upload (manual deploy only)."
