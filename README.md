@@ -16,7 +16,7 @@ static files on S3 website hosting.
 * [x] Merge PDF page (multi-file picker + drag & drop, reorder, manifest upload, exact-output polling, download)
 * [x] Split PDF page (single-file picker + drag & drop, every-page / ranges modes, manifest upload, exact-ZIP polling, download) — implemented, deployed, verified end-to-end
 * [x] Rotate PDF page (single-file picker + drag & drop, 90°/180°/270° + all/selected pages, manifest upload, exact-output polling, download) — implemented, deployed, verified end-to-end
-* [x] Delete Pages (single-file picker + drag & drop, pages-to-remove input, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
+* [x] Delete Pages (single-file picker + drag & drop, pages-to-remove input, manifest upload, exact-output polling, download) — implemented, deployed, verified end-to-end
 * [x] S3 upload via Cognito unauthenticated credentials (preserved behavior)
 * [x] AWS Lambda processing status polling (preserved behavior)
 * [x] S3 output presigned-URL download, 5-minute expiry (preserved behavior)
@@ -213,10 +213,14 @@ Status:
 
 Status:
 
-* Backend: Implemented + local/docker-tested, **NOT deployed** (no
-  `.delete.json` trigger yet; Lambda still runs the pre-delete image).
-* Frontend: Implemented + statically tested, **NOT deployed** (live site
-  still serves the pre-delete pages).
+* Backend: Implemented + deployed + verified (Lambda runs the delete image;
+  `.delete.json` suffix notification active; delete 2,4 → pages 1,3,5 and
+  delete 1-4 → only page 5 validated on AWS, every-page deletion rejected,
+  compress + merge + split + rotate regressions green).
+* Frontend: Implemented + deployed to the S3 static website
+  (`pdf-compressor-website-868942372673`, us-east-2) — Delete Pages UI is
+  live end-to-end, including real headless-browser runs (delete 2,4 and
+  1-4 with correct output, plus invalid-range rejection messaging).
 
 * Single-file upload: picker + drag & drop, PDF extension + 100 MB checked
   before upload; only the first file is kept if several are dropped.
