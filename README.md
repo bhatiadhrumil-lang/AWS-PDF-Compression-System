@@ -16,6 +16,7 @@ static files on S3 website hosting.
 * [x] Merge PDF page (multi-file picker + drag & drop, reorder, manifest upload, exact-output polling, download)
 * [x] Split PDF page (single-file picker + drag & drop, every-page / ranges modes, manifest upload, exact-ZIP polling, download) — implemented, deployed, verified end-to-end
 * [x] Rotate PDF page (single-file picker + drag & drop, 90°/180°/270° + all/selected pages, manifest upload, exact-output polling, download) — implemented, deployed, verified end-to-end
+* [x] Delete Pages (single-file picker + drag & drop, pages-to-remove input, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
 * [x] S3 upload via Cognito unauthenticated credentials (preserved behavior)
 * [x] AWS Lambda processing status polling (preserved behavior)
 * [x] S3 output presigned-URL download, 5-minute expiry (preserved behavior)
@@ -23,7 +24,6 @@ static files on S3 website hosting.
 * [x] Friendly errors with expandable technical details
 * [x] Editor + future-tool placeholder pages (honest “Coming soon”, no fake processing)
 * [ ] Edit PDF
-* [ ] Delete Pages
 * [ ] Extract Pages
 * [ ] PDF to JPG
 * [ ] JPG to PDF
@@ -208,6 +208,33 @@ Status:
   `rotate/<id>/<stem>-rotated.pdf` (same polling pattern) — then a single
   “Download rotated PDF” button uses the existing 5-minute presigned URL
   mechanism.
+
+### Delete Pages
+
+Status:
+
+* Backend: Implemented + local/docker-tested, **NOT deployed** (no
+  `.delete.json` trigger yet; Lambda still runs the pre-delete image).
+* Frontend: Implemented + statically tested, **NOT deployed** (live site
+  still serves the pre-delete pages).
+
+* Single-file upload: picker + drag & drop, PDF extension + 100 MB checked
+  before upload; only the first file is kept if several are dropped.
+* Pages to remove: a `2-4, 7` textbox (“Pages entered here will be
+  removed”). Range validation reuses the split parser (`parseSplitRanges`
+  — one parser, no drift): singles, spans, whitespace tolerated; rejects
+  empty, 0, reversed, malformed, duplicate and overlapping ranges, and more
+  than 50 ranges. Empty selection blocks submission; page-count bounds and
+  the every-page guard are enforced by the backend.
+* Manifest architecture: one `crypto.randomUUID()` request id per job; the
+  PDF goes to `uploads/<id>/<safe>.pdf`, then the manifest
+  `delete-requests/<id>.delete.json` is uploaded LAST (single Lambda
+  trigger): `{ "operation": "delete", "input": ...,
+  "pages": ["2-4", "7"], "output_name": "<safe>.pdf" }`. A failed PDF
+  upload rejects the chain, so the manifest is never sent.
+* Output handling: the frontend polls HeadObject for the EXACT key
+  `delete/<id>/<stem>-deleted.pdf` (same polling pattern) — then a single
+  “Download PDF” button uses the existing 5-minute presigned URL mechanism.
 
 ## Deployment
 

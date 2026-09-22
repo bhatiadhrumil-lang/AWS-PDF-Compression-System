@@ -56,9 +56,9 @@ window.PdfTools = [
     title: "Delete Pages",
     description: "Remove unwanted pages from your PDF.",
     icon: "trash",
-    status: "soon",
-    href: "tool.html?tool=delete-pages",
-    badge: "Coming soon"
+    status: "available",
+    href: "delete.html",
+    badge: "Available"
   },
   {
     id: "extract-pages",

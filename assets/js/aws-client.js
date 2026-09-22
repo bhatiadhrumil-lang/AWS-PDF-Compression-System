@@ -593,6 +593,75 @@ window.PdfCloud = (function () {
     });
   }
 
+  /* ---------------- Delete Pages helpers (additive; others untouched) ----
+   *
+   * Backend delete contract (see backend repo README, reference only):
+   *   input:   "uploads/<request-id>/<safe>.pdf" (same INPUT bucket)
+   *   manifest:"delete-requests/<request-id>.delete.json" (uploaded AFTER pdf)
+   *     { "operation": "delete", "input": ...,
+   *       "pages": ["2-4", "7"], "output_name": "<safe>.pdf" }
+   *   output:  "delete/<request-id>/<stem>-deleted.pdf" (exact poll)
+   *
+   * Page-range syntax is identical to split/rotate, so parseSplitRanges is
+   * reused directly — one parser, no drift. Deleting every page is rejected
+   * by the backend (a zero-page PDF is never produced).
+   */
+
+  function newDeleteRequestId() {
+    return newMergeRequestId();
+  }
+
+  function deleteInputKey(requestId, safeBaseName) {
+    return "uploads/" + String(requestId) + "/" + String(safeBaseName);
+  }
+
+  function deleteManifestKey(requestId) {
+    return cfg.DELETE_MANIFEST_PREFIX + String(requestId) + cfg.DELETE_MANIFEST_SUFFIX;
+  }
+
+  /* Mirror of backend stem sanitization (shared with split/rotate stems). */
+  function sanitizeDeleteStem(name, fallbackId) {
+    return sanitizeSplitStem(name, fallbackId);
+  }
+
+  /* Deterministic output key: "delete/<id>/<stem>-deleted.pdf". The backend
+   * derives the identical key, so the page polls this EXACT object. */
+  function expectedDeleteOutputKey(requestId, outputName) {
+    var id = String(requestId);
+    var stem = sanitizeDeleteStem(outputName, id);
+    return cfg.DELETE_OUTPUT_DIR + "/" + id + "/" + stem + "-deleted.pdf";
+  }
+
+  /* Pure manifest builder. Pages are required (backend rejects empties). */
+  function buildDeleteManifest(requestId, inputKey, pages, outputName) {
+    return {
+      operation: "delete",
+      input: inputKey,
+      pages: (pages || []).slice(),
+      output_name: outputName || (String(requestId) + ".pdf")
+    };
+  }
+
+  /* Upload the delete manifest (final trigger — call only after the PDF
+   * upload succeeded). Resolves with the manifest key. */
+  function putDeleteManifest(requestId, manifestObj) {
+    var key = deleteManifestKey(requestId);
+    var body = JSON.stringify(manifestObj);
+    return ensureCredentials().then(function () {
+      return new Promise(function (resolve, reject) {
+        s3.putObject({
+          Bucket: cfg.INPUT_BUCKET,
+          Key: key,
+          Body: body,
+          ContentType: "application/json"
+        }, function (err) {
+          if (err) reject(err);
+          else resolve(key);
+        });
+      });
+    });
+  }
+
   function technicalDetails(err) {
     if (!err) return "No technical details available.";
     var code = err.code || err.name || "UnknownError";
@@ -642,6 +711,13 @@ window.PdfCloud = (function () {
     buildRotateManifest: buildRotateManifest,
     parseRotateAngle: parseRotateAngle,
     putRotateManifest: putRotateManifest,
+    newDeleteRequestId: newDeleteRequestId,
+    deleteInputKey: deleteInputKey,
+    deleteManifestKey: deleteManifestKey,
+    sanitizeDeleteStem: sanitizeDeleteStem,
+    expectedDeleteOutputKey: expectedDeleteOutputKey,
+    buildDeleteManifest: buildDeleteManifest,
+    putDeleteManifest: putDeleteManifest,
     friendlyError: friendlyError,
     technicalDetails: technicalDetails,
     formatBytes: formatBytes

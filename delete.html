@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Delete pages from a PDF — remove 2-4,7 and download the trimmed file. Powered by AWS.">
+<title>Delete Pages — PDF Toolkit</title>
+<link rel="stylesheet" href="assets/css/styles.css">
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js" defer></script>
+<script src="assets/js/config.js" defer></script>
+<script src="assets/js/aws-client.js" defer></script>
+<script src="assets/js/delete.js" defer></script>
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav" aria-label="Main navigation">
+    <a class="brand" href="index.html"><span class="brand-mark">PDF</span><span>PDF Toolkit</span></a>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="index.html#tools">PDF Tools</a>
+      <a href="compress.html">Compress</a>
+      <a href="merge.html">Merge</a>
+      <a href="split.html">Split</a>
+      <a href="rotate.html">Rotate</a>
+      <a href="delete.html" class="active">Delete</a>
+      <a href="edit.html">Edit PDF</a>
+    </div>
+  </nav>
+</header>
+
+<section class="tool-hero">
+  <div class="wrap">
+    <a class="back-link" href="index.html">&larr; All tools</a>
+    <h1>Delete Pages</h1>
+    <p>Remove unwanted pages — the rest stay in order.</p>
+  </div>
+</section>
+
+<main class="wrap page">
+  <div class="stack">
+
+    <section class="card" aria-labelledby="delete-upload-heading">
+      <h2 id="delete-upload-heading" style="margin-top:0">1. Choose your PDF</h2>
+      <label class="dropzone" id="deleteDropzone">
+        <input id="deleteFiles" type="file" accept=".pdf,application/pdf">
+        <div class="dz-icon" aria-hidden="true">📄</div>
+        <strong>Drag &amp; drop your PDF here</strong>
+        <p>or click to browse &middot; PDF only &middot; one file &middot; up to 100 MB</p>
+      </label>
+      <p class="merge-hint" id="deleteFileName" aria-live="polite">No file selected.</p>
+
+      <h2 style="margin-bottom:8px">2. Choose pages to remove</h2>
+      <label for="deletePages"><strong>Pages to delete</strong> — pages entered here will be removed.</label>
+      <input id="deletePages" type="text" inputmode="text" autocomplete="off"
+             placeholder="2-4, 7" aria-describedby="deleteHint"
+             style="display:block;width:100%;margin-top:6px;padding:10px">
+      <p class="merge-hint" id="deleteHint">Select a PDF file to begin.</p>
+
+      <div class="progress" id="deleteProgressWrap" hidden>
+        <div id="deleteProgressFill"></div>
+      </div>
+      <div class="progress-row"><span id="deleteStatus" class="status-line">Ready — select a PDF to begin.</span><span id="deleteProgressPercent"></span></div>
+      <ol class="stepper" aria-label="Progress">
+        <li id="deleteStepSelect">Select</li>
+        <li id="deleteStepUpload">Upload</li>
+        <li id="deleteStepProcess">Delete</li>
+        <li id="deleteStepDone">Download</li>
+      </ol>
+      <p style="margin:18px 0 0"><button class="btn block" id="deleteBtn" disabled>Select a PDF to begin</button></p>
+    </section>
+
+    <section class="card result" id="deleteResultCard" hidden aria-labelledby="delete-result-heading" aria-live="polite">
+      <h2 id="delete-result-heading" style="margin-top:0">✅ Pages deleted!</h2>
+      <dl>
+        <dt>Removed</dt><dd id="deleteResultMode">—</dd>
+        <dt>Trimmed file</dt><dd id="deleteResultName">—</dd>
+      </dl>
+      <p style="margin:0 0 12px"><button class="btn block" id="deleteDownloadBtn">Download PDF</button></p>
+      <p style="margin:0"><button class="btn ghost block" id="deleteResetBtn">Delete More Pages</button></p>
+    </section>
+
+    <section class="card error-box" id="deleteErrorCard" hidden aria-live="assertive">
+      <p id="deleteErrorMessage">Something went wrong.</p>
+      <details>
+        <summary>Technical details</summary>
+        <div id="deleteErrorDetails">—</div>
+      </details>
+      <p style="margin:12px 0 0"><button class="btn ghost block" id="deleteRetryBtn">Try Again</button></p>
+    </section>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div>
+      <h4>PDF Toolkit</h4>
+      <p>Cloud-native PDF utilities on AWS (S3 · Lambda · Cognito).</p>
+    </div>
+    <div>
+      <h4>Tools</h4>
+      <ul>
+        <li><a href="compress.html">Compress PDF</a></li>
+        <li><a href="merge.html">Merge PDF</a></li>
+        <li><a href="split.html">Split PDF</a></li>
+        <li><a href="rotate.html">Rotate PDF</a></li>
+        <li><a href="delete.html">Delete Pages</a></li>
+        <li><a href="edit.html">Edit PDF</a></li>
+        <li><a href="index.html#tools">All tools</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Project</h4>
+      <ul>
+        <li><a href="https://github.com/bhatiadhrumil-lang/AWS-PDF-Compression-System" rel="noopener">GitHub repository</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="fineprint">Download links expire after 5 minutes. Delete uses one request manifest per job so outputs never mix between users.</div>
+</footer>
+
+</body>
+</html>

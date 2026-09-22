@@ -37,6 +37,13 @@ window.PdfConfig = {
   ROTATE_INPUT_PREFIX: "uploads/",
   ROTATE_OPTIONS: [90, 180, 270],
 
+  /* Delete Pages constants (mirror backend contract; client-side only).
+   * Page-range syntax/limits are shared with split/rotate. */
+  DELETE_MANIFEST_PREFIX: "delete-requests/",
+  DELETE_MANIFEST_SUFFIX: ".delete.json",
+  DELETE_OUTPUT_DIR: "delete",
+  DELETE_INPUT_PREFIX: "uploads/",
+
   /* Output polling: every 5s, up to ~2 minutes (matches Lambda timeout budget). */
   POLL_INTERVAL_MS: 5000,
   POLL_MAX_ATTEMPTS: 24,
