@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Compress PDF files online — reduce PDF size while preserving readability. Powered by AWS Lambda.">
+<title>Compress PDF — PDF Toolkit</title>
+<link rel="stylesheet" href="assets/css/styles.css">
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js" defer></script>
+<script src="assets/js/config.js" defer></script>
+<script src="assets/js/aws-client.js" defer></script>
+<script src="assets/js/compress.js" defer></script>
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav" aria-label="Main navigation">
+    <a class="brand" href="index.html"><span class="brand-mark">PDF</span><span>PDF Toolkit</span></a>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="index.html#tools">PDF Tools</a>
+      <a href="compress.html" class="active">Compress</a>
+      <a href="edit.html">Edit PDF</a>
+    </div>
+  </nav>
+</header>
+
+<section class="tool-hero">
+  <div class="wrap">
+    <a class="back-link" href="index.html">&larr; All tools</a>
+    <h1>Compress PDF</h1>
+    <p>Reduce PDF file size while preserving readability. Your file is uploaded to secure cloud storage, compressed by AWS Lambda, and returned with a private download link.</p>
+  </div>
+</section>
+
+<main class="wrap page">
+  <div class="stack">
+
+    <section class="card" aria-labelledby="upload-heading">
+      <h2 id="upload-heading" style="margin-top:0">1. Choose your PDF</h2>
+      <label class="dropzone" id="dropzone">
+        <input id="pdfFile" type="file" accept=".pdf,application/pdf">
+        <div class="dz-icon" aria-hidden="true">📄</div>
+        <strong>Drag &amp; drop your PDF here</strong>
+        <p>or click to browse &middot; PDF only &middot; up to 100 MB</p>
+      </label>
+      <div class="file-meta" id="fileMeta" hidden>
+        Selected file: <strong id="fileName">—</strong><br>
+        Original size: <strong id="fileSize">—</strong>
+      </div>
+      <div class="progress" id="progressWrap" hidden>
+        <div id="progressFill"></div>
+      </div>
+      <div class="progress-row"><span id="statusText" class="status-line">Ready — select a PDF to begin.</span><span id="progressPercent"></span></div>
+      <ol class="stepper" aria-label="Progress">
+        <li id="stepSelect">Select</li>
+        <li id="stepUpload">Upload</li>
+        <li id="stepProcess">Compress</li>
+        <li id="stepDone">Download</li>
+      </ol>
+      <p style="margin:18px 0 0"><button class="btn block" id="uploadBtn" disabled>Select a PDF first</button></p>
+    </section>
+
+    <section class="card result" id="resultCard" hidden aria-labelledby="result-heading" aria-live="polite">
+      <h2 id="result-heading" style="margin-top:0">✅ Your PDF is ready</h2>
+      <dl>
+        <dt>File</dt><dd id="resultName">—</dd>
+        <dt>Original size</dt><dd id="resultOriginal">—</dd>
+        <dt>Compressed size</dt><dd id="resultCompressed">—</dd>
+        <dt>Reduction</dt><dd id="resultReduction">—</dd>
+      </dl>
+      <p style="margin:0 0 12px"><button class="btn block" id="downloadBtn">Download compressed PDF</button></p>
+      <p style="margin:0"><button class="btn ghost block" id="resetBtn">Compress another file</button></p>
+    </section>
+
+    <section class="card error-box" id="errorCard" hidden aria-live="assertive">
+      <p id="errorMessage">Something went wrong.</p>
+      <details>
+        <summary>Technical details</summary>
+        <div id="errorDetails">—</div>
+      </details>
+      <p style="margin:12px 0 0"><button class="btn ghost block" id="retryBtn">Try again</button></p>
+    </section>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div>
+      <h4>PDF Toolkit</h4>
+      <p>Cloud-native PDF utilities on AWS (S3 · Lambda · Cognito).</p>
+    </div>
+    <div>
+      <h4>Tools</h4>
+      <ul>
+        <li><a href="compress.html">Compress PDF</a></li>
+        <li><a href="edit.html">Edit PDF</a></li>
+        <li><a href="index.html#tools">All tools</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Project</h4>
+      <ul>
+        <li><a href="https://github.com/bhatiadhrumil-lang/AWS-PDF-Compression-System" rel="noopener">GitHub repository</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="fineprint">Download links expire after 5 minutes. Your original filename is shown as-is; only the internal storage key is normalized.</div>
+</footer>
+
+</body>
+</html>
