@@ -25,7 +25,7 @@ static files on S3 website hosting.
   `.pdf` lowercased for the trigger filter; unique namespace per upload)
 * [x] Friendly errors with expandable technical details
 * [x] Editor + future-tool placeholder pages (honest “Coming soon”, no fake processing)
-* [ ] Edit PDF
+* [x] Edit PDF v1 page (pdf.js preview, overlay editor: text/draw/highlight/rect/image, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
 * [ ] Extract Pages
 * [ ] PDF to JPG
 * [ ] JPG to PDF
@@ -47,7 +47,7 @@ when the interactive PDF editor lands (it will need canvas rendering).
 index.html            homepage: hero, popular tools, all tools, how-it-works
 compress.html         dedicated compressor page (the working tool)
 merge.html            merge page (multi-file select, reorder, progress, download)
-edit.html             editor placeholder (planned features, coming soon)
+edit.html             edit page (pdf.js preview, overlay editor, manifest, download)
 tool.html?tool=<id>  generic placeholder for every other future tool
 assets/css/styles.css shared stylesheet (responsive, mobile-first)
 assets/js/config.js   public AWS identifiers + tunable limits (no secrets)
@@ -56,6 +56,7 @@ assets/js/aws-client.js Cognito/S3 service: upload, poll, download, errors (+ me
 assets/js/home.js     renders tool cards on the homepage
 assets/js/compress.js compressor page flow
 assets/js/merge.js    merge page flow (validate, reorder, ordered uploads, manifest, poll)
+assets/js/edit.js     edit page flow (pdf.js preview, overlay tools, ordered uploads, manifest, poll)
 assets/js/tool.js     renders generic placeholders from the registry
 ```
 
@@ -248,6 +249,42 @@ Status:
 * Output handling: the frontend polls HeadObject for the EXACT key
   `delete/<id>/<stem>-deleted.pdf` (same polling pattern) — then a single
   “Download PDF” button uses the existing 5-minute presigned URL mechanism.
+
+### Edit PDF v1
+
+Status:
+
+* Backend: Implemented + local/docker-tested, **NOT deployed** (no
+  `.edit.json` trigger yet; Lambda still runs the pre-edit image).
+* Frontend: Implemented + statically tested + headless-browser smoke-tested,
+  **NOT deployed** (live site still serves the placeholder edit page).
+
+* Single-file upload: picker + drag & drop, PDF extension + 100 MB checked
+  before upload; only the first file is kept if several are dropped.
+* Preview: pages render in-browser via pinned pdf.js 3.11.174 (cdnjs);
+  prev/next navigation; an overlay canvas aligned to the rendered page.
+* Tools: text (click to place, size/color), freehand draw (pointer drag,
+  width/color), highlight (drag box, color/opacity), rectangle (drag box,
+  color/width), image (PNG/JPEG picker, click to place at 200x150pt).
+  Per-page edits list with remove, undo-last, and clear-page.
+* Coordinates: manifest units are PDF points, origin bottom-left —
+  `pt = px * (pageWidthPt / canvasCssWidth)`, y flipped against page height.
+  Converted once at creation, so the manifest is deterministic; the backend
+  re-validates every box/point against the real mediabox.
+* Manifest architecture: one `crypto.randomUUID()` request id per job; the
+  PDF goes to `uploads/<id>/<safe>.pdf`, then overlay images to
+  `uploads/<id>/img-<n>.png|jpg`, then the manifest
+  `edit-requests/<id>.edit.json` is uploaded LAST (single Lambda trigger):
+  `{ "operation": "edit", "version": 1, "input": ...,
+  "output_name": "<safe>.pdf", "edits": [...] }`. Any failed upload rejects
+  the chain, so the manifest is never sent.
+* Output handling: the frontend polls HeadObject for the EXACT key
+  `edit/<id>/<stem>-edited.pdf` (same polling pattern) — then a single
+  “Download edited PDF” button uses the existing 5-minute presigned URL
+  mechanism.
+* Limitations (v1): Helvetica only; images stretch to the given box;
+  overlays apply in unrotated page space (`/Rotate` pages may misalign);
+  no in-place text editing of existing content — overlays only.
 
 ## Deployment
 

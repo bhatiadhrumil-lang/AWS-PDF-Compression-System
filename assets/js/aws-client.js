@@ -673,6 +673,103 @@ window.PdfCloud = (function () {
     });
   }
 
+  /* ---------------- Edit PDF v1 helpers (additive; others untouched) -----
+   *
+   * Backend edit contract (see backend repo README, reference only):
+   *   input:   "uploads/<request-id>/<safe>.pdf" (same INPUT bucket)
+   *   images:  "uploads/<request-id>/img-<n>.png|jpg" (uploaded BEFORE manifest)
+   *   manifest:"edit-requests/<request-id>.edit.json" (uploaded LAST)
+   *     { "operation": "edit", "version": 1, "input": ...,
+   *       "output_name": "<safe>.pdf", "edits": [...] }
+   *   output:  "edit/<request-id>/<stem>-edited.pdf" (exact poll)
+   *
+   * Coordinates are PDF points, origin bottom-left (see edit.js); units are
+   * converted once at creation time so the manifest is deterministic.
+   */
+
+  function newEditRequestId() {
+    return newMergeRequestId();
+  }
+
+  function editInputKey(requestId, safeBaseName) {
+    return "uploads/" + String(requestId) + "/" + String(safeBaseName);
+  }
+
+  function editManifestKey(requestId) {
+    return cfg.EDIT_MANIFEST_PREFIX + String(requestId) + cfg.EDIT_MANIFEST_SUFFIX;
+  }
+
+  /* Mirror of backend stem sanitization (shared with split/rotate stems). */
+  function sanitizeEditStem(name, fallbackId) {
+    return sanitizeSplitStem(name, fallbackId);
+  }
+
+  /* Deterministic output key: "edit/<id>/<stem>-edited.pdf". The backend
+   * derives the identical key, so the page polls this EXACT object. */
+  function expectedEditOutputKey(requestId, outputName) {
+    var id = String(requestId);
+    var stem = sanitizeEditStem(outputName, id);
+    return cfg.EDIT_OUTPUT_DIR + "/" + id + "/" + stem + "-edited.pdf";
+  }
+
+  /* Pure manifest builder. Edits are already backend-shaped
+   * (see edit.js coordinate convention); copied in order. */
+  function buildEditManifest(requestId, inputKey, outputName, edits) {
+    return {
+      operation: "edit",
+      version: cfg.EDIT_SCHEMA_VERSION || 1,
+      input: inputKey,
+      output_name: outputName || (String(requestId) + ".pdf"),
+      edits: (edits || []).slice()
+    };
+  }
+
+  /* Upload one overlay image to its exact namespaced key. PNG and JPEG
+   * only (the backend validates magic bytes and rejects the rest). */
+  function uploadEditImage(file, key, onProgress) {
+    var name = String((file && file.name) || "").toLowerCase();
+    var type = /\.png$/.test(name) ? "image/png" : "image/jpeg";
+    return ensureCredentials().then(function () {
+      return new Promise(function (resolve, reject) {
+        var task = s3.upload({
+          Bucket: cfg.INPUT_BUCKET,
+          Key: key,
+          Body: file,
+          ContentType: type
+        });
+        task.on("httpUploadProgress", function (e) {
+          if (onProgress && e.total) {
+            onProgress(Math.round((e.loaded / e.total) * 100));
+          }
+        });
+        task.send(function (err) {
+          if (err) reject(err);
+          else resolve(key);
+        });
+      });
+    });
+  }
+
+  /* Upload the edit manifest (final trigger — call only after the PDF and
+   * all images uploaded successfully). Resolves with the manifest key. */
+  function putEditManifest(requestId, manifestObj) {
+    var key = editManifestKey(requestId);
+    var body = JSON.stringify(manifestObj);
+    return ensureCredentials().then(function () {
+      return new Promise(function (resolve, reject) {
+        s3.putObject({
+          Bucket: cfg.INPUT_BUCKET,
+          Key: key,
+          Body: body,
+          ContentType: "application/json"
+        }, function (err) {
+          if (err) reject(err);
+          else resolve(key);
+        });
+      });
+    });
+  }
+
   function technicalDetails(err) {
     if (!err) return "No technical details available.";
     var code = err.code || err.name || "UnknownError";
@@ -731,6 +828,14 @@ window.PdfCloud = (function () {
     expectedDeleteOutputKey: expectedDeleteOutputKey,
     buildDeleteManifest: buildDeleteManifest,
     putDeleteManifest: putDeleteManifest,
+    newEditRequestId: newEditRequestId,
+    editInputKey: editInputKey,
+    editManifestKey: editManifestKey,
+    sanitizeEditStem: sanitizeEditStem,
+    expectedEditOutputKey: expectedEditOutputKey,
+    buildEditManifest: buildEditManifest,
+    uploadEditImage: uploadEditImage,
+    putEditManifest: putEditManifest,
     friendlyError: friendlyError,
     technicalDetails: technicalDetails,
     formatBytes: formatBytes

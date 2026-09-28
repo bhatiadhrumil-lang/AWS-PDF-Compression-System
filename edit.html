@@ -3,9 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Edit PDFs directly in your browser — coming soon to PDF Toolkit.">
-<title>Edit PDF — coming soon — PDF Toolkit</title>
+<meta name="description" content="Edit a PDF in your browser — add text, drawings, highlights, shapes and images. Powered by AWS.">
+<title>Edit PDF — PDF Toolkit</title>
 <link rel="stylesheet" href="assets/css/styles.css">
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+<script src="assets/js/config.js" defer></script>
+<script src="assets/js/aws-client.js" defer></script>
+<script src="assets/js/edit.js" defer></script>
 </head>
 <body>
 
@@ -17,6 +22,7 @@
       <a href="index.html#tools">PDF Tools</a>
       <a href="compress.html">Compress</a>
       <a href="merge.html">Merge</a>
+      <a href="split.html">Split</a>
       <a href="edit.html" class="active">Edit PDF</a>
     </div>
   </nav>
@@ -26,33 +32,126 @@
   <div class="wrap">
     <a class="back-link" href="index.html">&larr; All tools</a>
     <h1>Edit PDF</h1>
-    <p><span class="badge soon">Coming soon</span></p>
-    <p>Edit your PDF directly in your browser. The editor is not built yet — this page reserves its place and describes the plan so the UI doesn’t need restructuring later.</p>
+    <p>Add text, drawings, highlights, shapes and images — then download the finished PDF.</p>
   </div>
 </section>
 
 <main class="wrap page">
   <div class="stack">
-    <section class="card" aria-labelledby="planned-heading">
-      <h2 id="planned-heading" style="margin-top:0">Features planned</h2>
-      <ul class="feature-list">
-        <li>➕ Add text</li>
-        <li>✏️ Draw</li>
-        <li>🖍️ Highlight</li>
-        <li>🖼️ Add images</li>
-        <li>✍️ Add signature</li>
-        <li>⬛ Add shapes</li>
-        <li>🔁 Rotate pages</li>
-        <li>🗑️ Delete pages</li>
-        <li>↕️ Reorder pages</li>
-      </ul>
-      <p style="color:var(--muted)">Planned approach: pages render in the browser, edits are collected as an overlay layer, and the finished PDF is generated in the cloud. True in-place editing of existing PDF text comes later, if ever.</p>
+
+    <section class="card" aria-labelledby="edit-upload-heading">
+      <h2 id="edit-upload-heading" style="margin-top:0">1. Choose your PDF</h2>
+      <label class="dropzone" id="editDropzone">
+        <input id="editFiles" type="file" accept=".pdf,application/pdf">
+        <div class="dz-icon" aria-hidden="true">📄</div>
+        <strong>Drag &amp; drop your PDF here</strong>
+        <p>or click to browse &middot; PDF only &middot; one file &middot; up to 100 MB</p>
+      </label>
+      <p class="merge-hint" id="editFileName" aria-live="polite">No file selected.</p>
     </section>
-    <section class="card">
-      <h2 style="margin-top:0">Need something today?</h2>
-      <p style="color:var(--muted)">PDF compression already works end-to-end on this site.</p>
-      <p><a class="btn" href="compress.html">Try Compress PDF</a> <a class="btn ghost" href="index.html">All tools</a></p>
+
+    <section class="card" aria-labelledby="edit-tools-heading">
+      <h2 id="edit-tools-heading" style="margin-top:0">2. Add edits</h2>
+      <div class="pager" style="margin-bottom:12px">
+        <button class="mini-btn" id="editPrevPage" type="button" aria-label="Previous page">&larr;</button>
+        <span id="editPageLabel" aria-live="polite">Page — of —</span>
+        <button class="mini-btn" id="editNextPage" type="button" aria-label="Next page">&rarr;</button>
+      </div>
+      <div role="radiogroup" aria-label="Edit tool" style="margin-bottom:12px">
+        <label style="display:inline-block;margin:4px 12px 4px 0">
+          <input type="radio" name="editTool" value="text" checked> Text
+        </label>
+        <label style="display:inline-block;margin:4px 12px 4px 0">
+          <input type="radio" name="editTool" value="draw"> Draw
+        </label>
+        <label style="display:inline-block;margin:4px 12px 4px 0">
+          <input type="radio" name="editTool" value="highlight"> Highlight
+        </label>
+        <label style="display:inline-block;margin:4px 12px 4px 0">
+          <input type="radio" name="editTool" value="rect"> Rectangle
+        </label>
+        <label style="display:inline-block;margin:4px 12px 4px 0">
+          <input type="radio" name="editTool" value="image"> Image
+        </label>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:12px">
+        <label id="editTextRow">Text<br><input id="editText" type="text" value="Text" maxlength="2000" style="padding:8px"></label>
+        <label id="editSizeRow">Size<br>
+          <select id="editFontSize" style="padding:8px">
+            <option>10</option><option>12</option><option selected>16</option>
+            <option>24</option><option>36</option><option>48</option>
+          </select>
+        </label>
+        <label id="editWidthRow" hidden>Line width<br>
+          <select id="editLineWidth" style="padding:8px">
+            <option>1</option><option>2</option><option selected>3</option>
+            <option>5</option><option>8</option>
+          </select>
+        </label>
+        <label>Color<br><input id="editColor" type="color" value="#FF0000" style="padding:2px"></label>
+        <label id="editAlphaRow" hidden>Opacity<br>
+          <select id="editAlpha" style="padding:8px">
+            <option value="0.25">25%</option>
+            <option value="0.4" selected>40%</option>
+            <option value="0.6">60%</option>
+            <option value="1">100%</option>
+          </select>
+        </label>
+        <label id="editImageRow" hidden>Image (PNG/JPEG)<br>
+          <input id="editImageFiles" type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg">
+        </label>
+      </div>
+      <div id="editStage" style="position:relative;display:inline-block;max-width:100%">
+        <canvas id="editBaseCanvas" style="display:block;max-width:100%"></canvas>
+        <canvas id="editOverlayCanvas"
+                style="position:absolute;left:0;top:0;cursor:crosshair;touch-action:none"></canvas>
+      </div>
+      <div style="margin-top:12px">
+        <button class="mini-btn" id="editUndoBtn" type="button">Undo last</button>
+        <button class="mini-btn danger" id="editClearPageBtn" type="button">Clear this page</button>
+      </div>
+      <h3 style="margin-bottom:4px">Edits on this page</h3>
+      <ol class="merge-list" id="editList" aria-label="Edits on this page"></ol>
+      <p class="merge-hint" id="editEmpty">No edits on this page yet.</p>
+      <p class="merge-hint" id="editHint">Select a PDF file to begin.</p>
+      <p><span id="editCount">Edits: 0 / 200</span></p>
     </section>
+
+    <section class="card" aria-labelledby="edit-apply-heading">
+      <h2 id="edit-apply-heading" style="margin-top:0">3. Apply &amp; download</h2>
+      <p class="merge-hint">Your PDF uploads first, then overlay images, then the edit manifest — the cloud renders the finished PDF.</p>
+      <div class="progress" id="editProgressWrap" hidden>
+        <div id="editProgressFill"></div>
+      </div>
+      <div class="progress-row"><span id="editStatus" class="status-line">Ready — select a PDF to begin.</span><span id="editProgressPercent"></span></div>
+      <ol class="stepper" aria-label="Progress">
+        <li id="editStepSelect">Select</li>
+        <li id="editStepUpload">Upload</li>
+        <li id="editStepProcess">Edit</li>
+        <li id="editStepDone">Download</li>
+      </ol>
+      <p style="margin:18px 0 0"><button class="btn block" id="editBtn" disabled>Select a PDF to begin</button></p>
+    </section>
+
+    <section class="card result" id="editResultCard" hidden aria-labelledby="edit-result-heading" aria-live="polite">
+      <h2 id="edit-result-heading" style="margin-top:0">✅ Edit complete!</h2>
+      <dl>
+        <dt>Applied</dt><dd id="editResultMode">—</dd>
+        <dt>Edited file</dt><dd id="editResultName">—</dd>
+      </dl>
+      <p style="margin:0 0 12px"><button class="btn block" id="editDownloadBtn">Download edited PDF</button></p>
+      <p style="margin:0"><button class="btn ghost block" id="editResetBtn">Edit Another PDF</button></p>
+    </section>
+
+    <section class="card error-box" id="editErrorCard" hidden aria-live="assertive">
+      <p id="editErrorMessage">Something went wrong.</p>
+      <details>
+        <summary>Technical details</summary>
+        <div id="editErrorDetails">—</div>
+      </details>
+      <p style="margin:12px 0 0"><button class="btn ghost block" id="editRetryBtn">Try Again</button></p>
+    </section>
+
   </div>
 </main>
 
@@ -67,6 +166,7 @@
       <ul>
         <li><a href="compress.html">Compress PDF</a></li>
         <li><a href="merge.html">Merge PDF</a></li>
+        <li><a href="split.html">Split PDF</a></li>
         <li><a href="edit.html">Edit PDF</a></li>
         <li><a href="index.html#tools">All tools</a></li>
       </ul>
@@ -78,7 +178,7 @@
       </ul>
     </div>
   </div>
-  <div class="fineprint">The editor is a placeholder — it doesn’t process anything yet.</div>
+  <div class="fineprint">Download links expire after 5 minutes. Edit uses one request manifest per job so outputs never mix between users.</div>
 </footer>
 
 </body>

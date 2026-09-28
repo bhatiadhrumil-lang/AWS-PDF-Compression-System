@@ -44,6 +44,18 @@ window.PdfConfig = {
   DELETE_OUTPUT_DIR: "delete",
   DELETE_INPUT_PREFIX: "uploads/",
 
+  /* Edit PDF v1 constants (mirror backend contract; client-side only).
+   * Coordinates in manifests are PDF points, origin bottom-left
+   * (see assets/js/edit.js); images upload as separate objects. */
+  EDIT_MANIFEST_PREFIX: "edit-requests/",
+  EDIT_MANIFEST_SUFFIX: ".edit.json",
+  EDIT_OUTPUT_DIR: "edit",
+  EDIT_INPUT_PREFIX: "uploads/",
+  EDIT_SCHEMA_VERSION: 1,
+  EDIT_MAX_EDITS: 200,
+  EDIT_MAX_IMAGE_MB: 5,
+  EDIT_IMAGE_PREFIX: "img-",
+
   /* Output polling: every 5s, up to ~2 minutes (matches Lambda timeout budget). */
   POLL_INTERVAL_MS: 5000,
   POLL_MAX_ATTEMPTS: 24,
@@ -52,5 +64,9 @@ window.PdfConfig = {
   DOWNLOAD_URL_EXPIRES_S: 300,
 
   /* Pinned AWS SDK for JavaScript (v2) CDN build. */
-  AWS_SDK_URL: "https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js"
+  AWS_SDK_URL: "https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js",
+
+  /* Pinned pdf.js CDN build (edit-page preview rendering only). */
+  PDFJS_URL: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js",
+  PDFJS_WORKER_URL: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"
 };

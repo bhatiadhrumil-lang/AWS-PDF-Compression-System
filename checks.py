@@ -35,7 +35,7 @@ JS_BY_PAGE = {
     "split.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/split.js"],
     "rotate.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/rotate.js"],
     "delete.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/delete.js"],
-    "edit.html": [],
+    "edit.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/edit.js"],
     "tool.html": ["assets/js/tools.js", "assets/js/tool.js"],
 }
 
@@ -48,14 +48,16 @@ for page, scripts in JS_BY_PAGE.items():
         refs = set(re.findall(r'(?:getElementById|\$\()\s*["\']([^"\']+)["\']', js))
         # compress.js builds stepper ids dynamically ("step"+Capitalized),
         # merge.js builds "mergeStep"+Capitalized, split.js "splitStep"+Capitalized,
-        # rotate.js "rotateStep"+Capitalized, delete.js "deleteStep"+Capitalized.
-        missing = {r for r in refs if r not in defined and not r.startswith("step") and not r.startswith("mergeStep") and not r.startswith("splitStep") and not r.startswith("rotateStep") and not r.startswith("deleteStep") and r not in ("mergeStep", "splitStep", "rotateStep", "deleteStep")}
+        # rotate.js "rotateStep"+Capitalized, delete.js "deleteStep"+Capitalized,
+        # edit.js "editStep"+Capitalized.
+        missing = {r for r in refs if r not in defined and not r.startswith("step") and not r.startswith("mergeStep") and not r.startswith("splitStep") and not r.startswith("rotateStep") and not r.startswith("deleteStep") and not r.startswith("editStep") and r not in ("mergeStep", "splitStep", "rotateStep", "deleteStep", "editStep")}
         # resolve dynamic stepper ids explicitly
         dyn_ok = all(("step" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
         merge_dyn_ok = all(("mergeStep" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
         split_dyn_ok = all(("splitStep" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
         rotate_dyn_ok = all(("rotateStep" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
         delete_dyn_ok = all(("deleteStep" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
+        edit_dyn_ok = all(("editStep" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
         if missing:
             fail(f"{page} <- {script}: missing ids {sorted(missing)}")
         elif script == "assets/js/compress.js" and not dyn_ok:
@@ -68,6 +70,8 @@ for page, scripts in JS_BY_PAGE.items():
             fail(f"{page}: dynamic rotate stepper ids missing")
         elif script == "assets/js/delete.js" and not delete_dyn_ok:
             fail(f"{page}: dynamic delete stepper ids missing")
+        elif script == "assets/js/edit.js" and not edit_dyn_ok:
+            fail(f"{page}: dynamic edit stepper ids missing")
         else:
             ok(f"{page} <- {script}: ids resolve")
 
@@ -152,8 +156,8 @@ for js_file in sorted((ROOT / "assets/js").glob("*.js")):
     else:
         ok(f"{js_file.name}: brackets balanced")
 
-# 7. placeholders must not fake processing
-for probe in ["edit.html", "tool.html", "assets/js/tool.js"]:
+# 7. placeholders must not fake processing (edit.html is a real tool now)
+for probe in ["tool.html", "assets/js/tool.js"]:
     text = (ROOT / probe).read_text(encoding="utf-8").lower()
     for bad in ["s3.upload", "putobject", "getSignedUrl".lower(), "headobject"]:
         if bad in text:

@@ -18,11 +18,11 @@ window.PdfTools = [
   {
     id: "edit",
     title: "Edit PDF",
-    description: "Add text, drawings, images and signatures (planned).",
+    description: "Add text, drawings, highlights, shapes and images.",
     icon: "edit",
-    status: "soon",
+    status: "available",
     href: "edit.html",
-    badge: "Coming soon"
+    badge: "Available"
   },
   {
     id: "merge",
