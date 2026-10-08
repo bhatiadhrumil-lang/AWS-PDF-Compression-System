@@ -673,6 +673,121 @@ window.PdfCloud = (function () {
     });
   }
 
+  /* ---------------- JPG to PDF helpers (additive; others untouched) ----
+   *
+   * Backend jpg_to_pdf contract (see backend repo README, reference only):
+   *   images:  "uploads/<request-id>/<safe>.jpg" (same INPUT bucket,
+   *            UI order = PDF page order)
+   *   manifest:"jpg-to-pdf-requests/<request-id>.jpg2pdf.json" (LAST)
+   *     { "operation": "jpg_to_pdf", "images": [...],
+   *       "output_name": "<request-id>.pdf" }
+   *   output:  "jpg-to-pdf/<request-id>/<safe-name>.pdf" (exact poll)
+   *
+   * Uploads reuse uploadEditImage (JPEG content type); only .jpg/.jpeg
+   * (any case) are accepted. The manifest is the Lambda trigger and MUST
+   * be uploaded only after every image upload has succeeded.
+   */
+
+  function newJpgToPdfRequestId() {
+    return newMergeRequestId();
+  }
+
+  /* S3-safe basename for one image: same readable rules as readableBase
+   * (keeps spaces/parens/unicode, neutralizes only path separators and
+   * control chars) but the extension normalizes to ".jpg"/".jpeg"
+   * (lowercased — the backend matches the extension case-insensitively). */
+  function sanitizeJpgFileName(originalName) {
+    var name = String(originalName || "image.jpg");
+    name = name.split("/").pop().split("\\").pop();
+    var dot = name.lastIndexOf(".");
+    var base = dot > 0 ? name.slice(0, dot) : name;
+    var ext = dot > 0 ? name.slice(dot).toLowerCase() : "";
+    if (ext !== ".jpg" && ext !== ".jpeg") ext = ".jpg";
+    // eslint-disable-next-line no-control-regex
+    base = base.replace(/[\x00-\x1f\x7f]/g, "");
+    base = base.replace(/[\/\\]+/g, "_");
+    base = base.replace(/^\.+|\.+$/g, "");
+    if (!base) base = "image";
+    return base.slice(0, 120) + ext;
+  }
+
+  /* Full input key for one image: uploads/<request-id>/<safe-name>.
+   * Callers de-duplicate safe names within a request (see jpg-to-pdf.js). */
+  function jpgToPdfInputKey(requestId, safeFileName) {
+    return "uploads/" + String(requestId) + "/" + String(safeFileName);
+  }
+
+  function jpgToPdfManifestKey(requestId) {
+    return cfg.JPG2PDF_MANIFEST_PREFIX + String(requestId) + cfg.JPG2PDF_MANIFEST_SUFFIX;
+  }
+
+  /* Mirror of backend sanitize_output_basename: drop directories, strip
+   * control chars, enforce .pdf. Spaces/parens/unicode are preserved. */
+  function sanitizeJpgOutputName(name, fallbackId) {
+    var raw = String(name || "");
+    raw = raw.split("/").pop().split("\\").pop().trim();
+    // eslint-disable-next-line no-control-regex
+    raw = raw.replace(/[\x00-\x1f\x7f]/g, "");
+    if (!raw) raw = String(fallbackId || "document") + ".pdf";
+    if (!/\.pdf$/i.test(raw)) raw = raw + ".pdf";
+    return raw;
+  }
+
+  /* Deterministic output key: "jpg-to-pdf/<id>/<safe-name>.pdf". */
+  function expectedJpgToPdfOutputKey(requestId, outputName) {
+    var id = String(requestId);
+    var safe = sanitizeJpgOutputName(outputName || (id + ".pdf"), id);
+    return cfg.JPG2PDF_OUTPUT_DIR + "/" + id + "/" + safe;
+  }
+
+  /* Pure manifest builder — preserves the exact UI order of imageKeys. */
+  function buildJpgToPdfManifest(requestId, imageKeys, outputName) {
+    return {
+      operation: "jpg_to_pdf",
+      images: (imageKeys || []).slice(),
+      output_name: outputName || (String(requestId) + ".pdf")
+    };
+  }
+
+  /* Pure single-image validation: JPEG type/extension, non-empty, size cap.
+   * Returns { ok, reason } with reason in type|empty|size. */
+  function validateJpgFile(file) {
+    if (!file) return { ok: false, reason: "empty" };
+    var name = String(file.name || "");
+    var ext = (name.split(".").pop() || "").toLowerCase();
+    if (ext !== "jpg" && ext !== "jpeg") {
+      return { ok: false, reason: "type" };
+    }
+    if (file.type && file.type !== "image/jpeg" && file.type !== "image/jpg") {
+      return { ok: false, reason: "type" };
+    }
+    if (!file.size || file.size <= 0) return { ok: false, reason: "empty" };
+    if (file.size > cfg.MAX_FILE_SIZE_MB * 1024 * 1024) {
+      return { ok: false, reason: "size" };
+    }
+    return { ok: true, reason: "" };
+  }
+
+  /* Upload the jpg-to-pdf manifest (final trigger — call only after ALL
+   * image uploads succeeded). Resolves with the manifest key. */
+  function putJpgToPdfManifest(requestId, manifestObj) {
+    var key = jpgToPdfManifestKey(requestId);
+    var body = JSON.stringify(manifestObj);
+    return ensureCredentials().then(function () {
+      return new Promise(function (resolve, reject) {
+        s3.putObject({
+          Bucket: cfg.INPUT_BUCKET,
+          Key: key,
+          Body: body,
+          ContentType: "application/json"
+        }, function (err) {
+          if (err) reject(err);
+          else resolve(key);
+        });
+      });
+    });
+  }
+
   /* ---------------- Extract Pages helpers (additive; others untouched) ---
    *
    * Backend extract contract (see backend repo README, reference only):
@@ -987,6 +1102,15 @@ window.PdfCloud = (function () {
     expectedDeleteOutputKey: expectedDeleteOutputKey,
     buildDeleteManifest: buildDeleteManifest,
     putDeleteManifest: putDeleteManifest,
+    newJpgToPdfRequestId: newJpgToPdfRequestId,
+    sanitizeJpgFileName: sanitizeJpgFileName,
+    jpgToPdfInputKey: jpgToPdfInputKey,
+    jpgToPdfManifestKey: jpgToPdfManifestKey,
+    sanitizeJpgOutputName: sanitizeJpgOutputName,
+    expectedJpgToPdfOutputKey: expectedJpgToPdfOutputKey,
+    buildJpgToPdfManifest: buildJpgToPdfManifest,
+    validateJpgFile: validateJpgFile,
+    putJpgToPdfManifest: putJpgToPdfManifest,
     newExtractRequestId: newExtractRequestId,
     extractInputKey: extractInputKey,
     extractManifestKey: extractManifestKey,

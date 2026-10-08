@@ -83,9 +83,9 @@ window.PdfTools = [
     title: "JPG to PDF",
     description: "Turn JPG images into a PDF document.",
     icon: "pdfdoc",
-    status: "soon",
-    href: "tool.html?tool=jpg-to-pdf",
-    badge: "Coming soon"
+    status: "available",
+    href: "jpg-to-pdf.html",
+    badge: "Available"
   },
   {
     id: "watermark",

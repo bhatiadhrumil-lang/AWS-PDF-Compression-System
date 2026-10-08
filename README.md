@@ -27,8 +27,8 @@ static files on S3 website hosting.
 * [x] Editor + future-tool placeholder pages (honest “Coming soon”, no fake processing)
 * [x] Edit PDF workspace (viewer, 14 tools, selection, undo/redo, page ops, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
 * [x] Extract Pages (single-file picker + drag & drop, checkbox tiles + range entry, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
+* [x] JPG to PDF (multi-image picker + drag & drop, previews, reorder, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
 * [ ] PDF to JPG
-* [ ] JPG to PDF
 * [ ] Watermark PDF
 * [ ] Add Page Numbers
 * [ ] Protect PDF
@@ -285,6 +285,38 @@ Status:
   `extract/<id>/<stem>-extracted.pdf` (same polling pattern) — then a
   single “Download extracted PDF” button uses the existing 5-minute
   presigned URL mechanism. The source PDF is never modified.
+
+### JPG to PDF
+
+Status:
+
+* Backend: Implemented + tested, **NOT deployed** (no `.jpg2pdf.json`
+  trigger yet; deployment happens separately via the backend pipeline —
+  never manually from here).
+* Frontend: Implemented + statically tested, **NOT deployed**. Code pushed
+  to GitHub; AWS deployment happens automatically via the existing
+  CodePipeline — never manually.
+
+* Multi-image upload: picker (multiple) + drag & drop, JPEG type/extension
+  + 100 MB per file checked before upload; up to 20 images, 200 MB total.
+  “+ Add more images” appends without resetting the list.
+* Ordering: each row shows a live thumbnail preview, position number, file
+  name, size, and remove button, plus ↑/↓ buttons and drag-and-drop
+  reordering; “Clear all” empties the list. The manifest `images` array is
+  built from the UI order and never re-sorted — it becomes the PDF page
+  order. Removing an image revokes its preview URL and updates totals.
+* Manifest architecture: one `crypto.randomUUID()` request id per job;
+  images go to `uploads/<id>/<safe>.jpg` in order (duplicate names get
+  `_2` suffixes), then the manifest
+  `jpg-to-pdf-requests/<id>.jpg2pdf.json` is uploaded LAST (single Lambda
+  trigger): `{ "operation": "jpg_to_pdf", "images": [...],
+  "output_name": "<request-id>.pdf" }`. A failed image upload rejects the
+  chain, so the manifest is never sent.
+* Output handling: the frontend polls HeadObject for the EXACT key
+  `jpg-to-pdf/<id>/<request-id>.pdf` (same polling pattern) — then a
+  single “Download PDF” button uses the existing 5-minute presigned URL
+  mechanism with a friendly download name. Source images are never
+  modified.
 
 ### Edit PDF (professional editor workspace)
 

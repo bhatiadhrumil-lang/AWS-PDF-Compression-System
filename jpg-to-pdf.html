@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Convert JPG images to PDF online — combine photos into one PDF in your chosen order. Powered by AWS.">
+<title>JPG to PDF — PDF Toolkit</title>
+<link rel="stylesheet" href="assets/css/styles.css">
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js" defer></script>
+<script src="assets/js/config.js" defer></script>
+<script src="assets/js/aws-client.js" defer></script>
+<script src="assets/js/jpg-to-pdf.js" defer></script>
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav" aria-label="Main navigation">
+    <a class="brand" href="index.html"><span class="brand-mark">PDF</span><span>PDF Toolkit</span></a>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="index.html#tools">PDF Tools</a>
+      <a href="compress.html">Compress</a>
+      <a href="merge.html">Merge</a>
+      <a href="split.html">Split</a>
+      <a href="extract.html">Extract</a>
+      <a href="jpg-to-pdf.html" class="active">JPG&nbsp;to&nbsp;PDF</a>
+      <a href="edit.html">Edit PDF</a>
+    </div>
+  </nav>
+</header>
+
+<section class="tool-hero">
+  <div class="wrap">
+    <a class="back-link" href="index.html">&larr; All tools</a>
+    <h1>JPG to PDF</h1>
+    <p>Turn JPG images into a single PDF — one image per page, in the order you arrange.</p>
+  </div>
+</section>
+
+<main class="wrap page">
+  <div class="stack">
+
+    <section class="card" aria-labelledby="jpg-upload-heading">
+      <h2 id="jpg-upload-heading" style="margin-top:0">1. Choose your images</h2>
+      <label class="dropzone" id="jpgDropzone">
+        <input id="jpgFiles" type="file" accept=".jpg,.jpeg,image/jpeg" multiple>
+        <div class="dz-icon" aria-hidden="true">🖼️</div>
+        <strong>Drag &amp; drop your JPG images here</strong>
+        <p>or click to browse &middot; JPG/JPEG only &middot; up to 20 images &middot; up to 100 MB each &middot; 200 MB total</p>
+      </label>
+      <p style="margin:12px 0 0"><button class="btn ghost block" id="jpgAddMoreBtn" type="button">+ Add more images</button></p>
+      <input id="jpgFilesMore" type="file" accept=".jpg,.jpeg,image/jpeg" multiple hidden>
+
+      <div class="merge-totals" aria-live="polite">
+        <span id="jpgCount">Images: 0 / 20</span>
+        <span id="jpgTotalSize">Total size: 0 B / 200 MB</span>
+      </div>
+
+      <ol class="merge-list" id="jpgList" aria-label="Selected images in page order"></ol>
+      <p style="margin:12px 0 0"><button class="btn ghost block" id="jpgClearBtn" type="button" disabled>Clear all</button></p>
+      <p class="merge-hint" id="jpgHint">Select at least one JPG image to begin. Drag items to reorder, or use the up/down buttons.</p>
+
+      <div class="progress" id="jpgProgressWrap" hidden>
+        <div id="jpgProgressFill"></div>
+      </div>
+      <div class="progress-row"><span id="jpgStatus" class="status-line">Ready — select images to begin.</span><span id="jpgProgressPercent"></span></div>
+      <ol class="stepper" aria-label="Progress">
+        <li id="jpgStepSelect">Select</li>
+        <li id="jpgStepUpload">Upload</li>
+        <li id="jpgStepProcess">Convert</li>
+        <li id="jpgStepDone">Download</li>
+      </ol>
+      <p style="margin:18px 0 0"><button class="btn block" id="jpgBtn" disabled>Select images to begin</button></p>
+    </section>
+
+    <section class="card result" id="jpgResultCard" hidden aria-labelledby="jpg-result-heading" aria-live="polite">
+      <h2 id="jpg-result-heading" style="margin-top:0">✅ Conversion complete!</h2>
+      <dl>
+        <dt>Images</dt><dd id="jpgResultCount">—</dd>
+        <dt>Total input size</dt><dd id="jpgResultSize">—</dd>
+        <dt>PDF file</dt><dd id="jpgResultName">—</dd>
+      </dl>
+      <p style="margin:0 0 12px"><button class="btn block" id="jpgDownloadBtn">Download PDF</button></p>
+      <p style="margin:0"><button class="btn ghost block" id="jpgResetBtn">Convert More Images</button></p>
+    </section>
+
+    <section class="card error-box" id="jpgErrorCard" hidden aria-live="assertive">
+      <p id="jpgErrorMessage">Something went wrong.</p>
+      <details>
+        <summary>Technical details</summary>
+        <div id="jpgErrorDetails">—</div>
+      </details>
+      <p style="margin:12px 0 0"><button class="btn ghost block" id="jpgRetryBtn">Try Again</button></p>
+    </section>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div>
+      <h4>PDF Toolkit</h4>
+      <p>Cloud-native PDF utilities on AWS (S3 · Lambda · Cognito).</p>
+    </div>
+    <div>
+      <h4>Tools</h4>
+      <ul>
+        <li><a href="compress.html">Compress PDF</a></li>
+        <li><a href="merge.html">Merge PDF</a></li>
+        <li><a href="split.html">Split PDF</a></li>
+        <li><a href="extract.html">Extract Pages</a></li>
+        <li><a href="jpg-to-pdf.html">JPG to PDF</a></li>
+        <li><a href="edit.html">Edit PDF</a></li>
+        <li><a href="index.html#tools">All tools</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Project</h4>
+      <ul>
+        <li><a href="https://github.com/bhatiadhrumil-lang/AWS-PDF-Compression-System" rel="noopener">GitHub repository</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="fineprint">Download links expire after 5 minutes. Conversion uses one request manifest per job so outputs never mix between users.</div>
+</footer>
+
+</body>
+</html>

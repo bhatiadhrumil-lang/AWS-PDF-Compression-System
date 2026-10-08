@@ -54,6 +54,16 @@ window.PdfConfig = {
   EXTRACT_INPUT_PREFIX: "uploads/",
   EXTRACT_MAX_PAGES: 500,
 
+  /* JPG to PDF constants (mirror backend contract; client-side only).
+   * Images upload to uploads/<id>/ and the manifest triggers conversion
+   * into a single PDF with one image per page, in listed order. */
+  JPG2PDF_MANIFEST_PREFIX: "jpg-to-pdf-requests/",
+  JPG2PDF_MANIFEST_SUFFIX: ".jpg2pdf.json",
+  JPG2PDF_OUTPUT_DIR: "jpg-to-pdf",
+  JPG2PDF_INPUT_PREFIX: "uploads/",
+  JPG2PDF_MAX_IMAGES: 20,
+  JPG2PDF_MAX_TOTAL_MB: 200,
+
   /* Edit PDF v1 constants (mirror backend contract; client-side only).
    * Coordinates in manifests are PDF points, origin bottom-left
    * (see assets/js/edit.js); images upload as separate objects. */
