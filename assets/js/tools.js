@@ -65,9 +65,9 @@ window.PdfTools = [
     title: "Extract Pages",
     description: "Pull selected pages out into a new PDF.",
     icon: "extract",
-    status: "soon",
-    href: "tool.html?tool=extract-pages",
-    badge: "Coming soon"
+    status: "available",
+    href: "extract.html",
+    badge: "Available"
   },
   {
     id: "pdf-to-jpg",

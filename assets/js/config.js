@@ -44,6 +44,16 @@ window.PdfConfig = {
   DELETE_OUTPUT_DIR: "delete",
   DELETE_INPUT_PREFIX: "uploads/",
 
+  /* Extract Pages constants (mirror backend contract; client-side only).
+   * The page list is explicit ints in requested order (checkboxes and/or
+   * range text expanded client-side); bounds are enforced by the backend,
+   * which knows the document page count. */
+  EXTRACT_MANIFEST_PREFIX: "extract-requests/",
+  EXTRACT_MANIFEST_SUFFIX: ".extract.json",
+  EXTRACT_OUTPUT_DIR: "extract",
+  EXTRACT_INPUT_PREFIX: "uploads/",
+  EXTRACT_MAX_PAGES: 500,
+
   /* Edit PDF v1 constants (mirror backend contract; client-side only).
    * Coordinates in manifests are PDF points, origin bottom-left
    * (see assets/js/edit.js); images upload as separate objects. */

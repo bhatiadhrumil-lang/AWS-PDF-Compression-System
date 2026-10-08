@@ -26,7 +26,7 @@ static files on S3 website hosting.
 * [x] Friendly errors with expandable technical details
 * [x] Editor + future-tool placeholder pages (honest “Coming soon”, no fake processing)
 * [x] Edit PDF workspace (viewer, 14 tools, selection, undo/redo, page ops, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
-* [ ] Extract Pages
+* [x] Extract Pages (single-file picker + drag & drop, checkbox tiles + range entry, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
 * [ ] PDF to JPG
 * [ ] JPG to PDF
 * [ ] Watermark PDF
@@ -252,6 +252,39 @@ Status:
 * Output handling: the frontend polls HeadObject for the EXACT key
   `delete/<id>/<stem>-deleted.pdf` (same polling pattern) — then a single
   “Download PDF” button uses the existing 5-minute presigned URL mechanism.
+
+### Extract Pages
+
+Status:
+
+* Backend: Implemented + tested, **NOT deployed** (no `.extract.json`
+  trigger yet; deployment happens separately via the backend pipeline —
+  never manually from here).
+* Frontend: Implemented + statically tested, **NOT deployed**. Code pushed
+  to GitHub; AWS deployment happens automatically via the existing
+  CodePipeline — never manually.
+
+* Single-file upload: picker + drag & drop, PDF extension + 100 MB checked
+  before upload; only the first file is kept if several are dropped.
+* Page selection: the page count is read locally via the pinned pdf.js
+  build and every page becomes a checkbox tile (Select All / Clear);
+  a `1, 3, 5-7` range box adds pages in listed order. The selection keeps
+  REQUESTED order (`5, 2, 8` extracts 5, 2, 8) and duplicates normalize
+  (`1,3,3,5-7` → `1, 3, 5, 6, 7`). Client validation rejects empty
+  entries, 0, reversed and malformed ranges plus out-of-range pages (when
+  the count is known) and selections over 500 pages; remaining bounds are
+  enforced by the backend, which knows the PDF. If the preview library
+  cannot load, range entry still works.
+* Manifest architecture: one `crypto.randomUUID()` request id per job; the
+  PDF goes to `uploads/<id>/<safe>.pdf`, then the manifest
+  `extract-requests/<id>.extract.json` is uploaded LAST (single Lambda
+  trigger): `{ "operation": "extract", "input": ...,
+  "pages": [1, 3, 5, 6, 7], "output_name": "<safe>.pdf" }`. A failed PDF
+  upload rejects the chain, so the manifest is never sent.
+* Output handling: the frontend polls HeadObject for the EXACT key
+  `extract/<id>/<stem>-extracted.pdf` (same polling pattern) — then a
+  single “Download extracted PDF” button uses the existing 5-minute
+  presigned URL mechanism. The source PDF is never modified.
 
 ### Edit PDF (professional editor workspace)
 

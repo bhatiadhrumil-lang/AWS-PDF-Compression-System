@@ -673,6 +673,129 @@ window.PdfCloud = (function () {
     });
   }
 
+  /* ---------------- Extract Pages helpers (additive; others untouched) ---
+   *
+   * Backend extract contract (see backend repo README, reference only):
+   *   input:   "uploads/<request-id>/<safe>.pdf" (same INPUT bucket)
+   *   manifest:"extract-requests/<request-id>.extract.json" (uploaded AFTER pdf)
+   *     { "operation": "extract", "input": ...,
+   *       "pages": [1, 3, 5, 6, 7], "output_name": "<safe>.pdf" }
+   *   output:  "extract/<request-id>/<stem>-extracted.pdf" (exact poll)
+   *
+   * Pages are explicit ints in REQUESTED order (checkboxes and/or range
+   * text expanded client-side). Duplicates are normalized, never an
+   * error. Bounds are enforced by the backend, which knows the document;
+   * the parser below only checks syntax plus an optional known pageCount.
+   */
+
+  function newExtractRequestId() {
+    return newMergeRequestId();
+  }
+
+  function extractInputKey(requestId, safeBaseName) {
+    return "uploads/" + String(requestId) + "/" + String(safeBaseName);
+  }
+
+  function extractManifestKey(requestId) {
+    return cfg.EXTRACT_MANIFEST_PREFIX + String(requestId) + cfg.EXTRACT_MANIFEST_SUFFIX;
+  }
+
+  /* Mirror of backend stem sanitization (shared with split/rotate/delete). */
+  function sanitizeExtractStem(name, fallbackId) {
+    return sanitizeSplitStem(name, fallbackId);
+  }
+
+  /* Deterministic output key: "extract/<id>/<stem>-extracted.pdf". The
+   * backend derives the identical key, so the page polls this EXACT object. */
+  function expectedExtractOutputKey(requestId, outputName) {
+    var id = String(requestId);
+    var stem = sanitizeExtractStem(outputName, id);
+    return cfg.EXTRACT_OUTPUT_DIR + "/" + id + "/" + stem + "-extracted.pdf";
+  }
+
+  /* Pure manifest builder. Pages are required (backend rejects empties). */
+  function buildExtractManifest(requestId, inputKey, pages, outputName) {
+    return {
+      operation: "extract",
+      input: inputKey,
+      pages: (pages || []).slice(),
+      output_name: outputName || (String(requestId) + ".pdf")
+    };
+  }
+
+  /* Pure range-text parser for the extract page. Returns
+   * { ok, pages[], error }. Syntax ("5", "1-3", comma-separated) mirrors
+   * split; differences: duplicates normalize (first occurrence wins),
+   * overlap is NOT an error, expansion is capped at EXTRACT_MAX_PAGES.
+   * pageCount (when the PDF was read locally) adds bounds checking;
+   * otherwise bounds are enforced by the backend. */
+  function parseExtractRanges(text, pageCount) {
+    var max = cfg.EXTRACT_MAX_PAGES || 500;
+    var raw = String(text || "");
+    var pieces = raw.split(",");
+    var expanded = [];
+    var seen = {};
+    for (var k = 0; k < pieces.length; k++) {
+      var trimmed = pieces[k].trim();
+      if (!trimmed) {
+        return { ok: false, pages: [], error: "There is an empty entry — check for stray commas (e.g. “1,,2”)." };
+      }
+      var single = /^\d+$/.exec(trimmed);
+      var span = /^(\d+)\s*-\s*(\d+)$/.exec(trimmed);
+      var start = 0, end = 0;
+      if (single) {
+        start = end = parseInt(single[0], 10);
+      } else if (span) {
+        start = parseInt(span[1], 10);
+        end = parseInt(span[2], 10);
+      } else {
+        return { ok: false, pages: [], error: "“" + trimmed + "” is not a valid entry. Use a page like 5 or a span like 1-3." };
+      }
+      if (start < 1 || end < 1) {
+        return { ok: false, pages: [], error: "“" + trimmed + "” is not valid — pages start at 1." };
+      }
+      if (start > end) {
+        return { ok: false, pages: [], error: "“" + trimmed + "” is reversed — the first page must come first." };
+      }
+      for (var p = start; p <= end; p++) {
+        if (pageCount && p > pageCount) {
+          return { ok: false, pages: [], error: "Page " + p + " does not exist. This document has " + pageCount + " pages." };
+        }
+        if (!seen[p]) {
+          seen[p] = true;
+          expanded.push(p);
+        }
+        if (expanded.length > max) {
+          return { ok: false, pages: [], error: "Too many pages selected — up to " + max + " at a time." };
+        }
+      }
+    }
+    if (!expanded.length) {
+      return { ok: false, pages: [], error: "Enter at least one page, e.g. 1, 3, 5-7." };
+    }
+    return { ok: true, pages: expanded, error: "" };
+  }
+
+  /* Upload the extract manifest (final trigger — call only after the PDF
+   * upload succeeded). Resolves with the manifest key. */
+  function putExtractManifest(requestId, manifestObj) {
+    var key = extractManifestKey(requestId);
+    var body = JSON.stringify(manifestObj);
+    return ensureCredentials().then(function () {
+      return new Promise(function (resolve, reject) {
+        s3.putObject({
+          Bucket: cfg.INPUT_BUCKET,
+          Key: key,
+          Body: body,
+          ContentType: "application/json"
+        }, function (err) {
+          if (err) reject(err);
+          else resolve(key);
+        });
+      });
+    });
+  }
+
   /* ---------------- Edit PDF v1 helpers (additive; others untouched) -----
    *
    * Backend edit contract (see backend repo README, reference only):
@@ -864,6 +987,14 @@ window.PdfCloud = (function () {
     expectedDeleteOutputKey: expectedDeleteOutputKey,
     buildDeleteManifest: buildDeleteManifest,
     putDeleteManifest: putDeleteManifest,
+    newExtractRequestId: newExtractRequestId,
+    extractInputKey: extractInputKey,
+    extractManifestKey: extractManifestKey,
+    sanitizeExtractStem: sanitizeExtractStem,
+    expectedExtractOutputKey: expectedExtractOutputKey,
+    buildExtractManifest: buildExtractManifest,
+    parseExtractRanges: parseExtractRanges,
+    putExtractManifest: putExtractManifest,
     newEditRequestId: newEditRequestId,
     editInputKey: editInputKey,
     editManifestKey: editManifestKey,
