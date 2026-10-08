@@ -27,7 +27,7 @@ def ok(msg):
     print("ok:", msg)
 
 
-HTML_FILES = ["index.html", "compress.html", "merge.html", "split.html", "rotate.html", "delete.html", "edit.html", "extract.html", "jpg-to-pdf.html", "tool.html"]
+HTML_FILES = ["index.html", "compress.html", "merge.html", "split.html", "rotate.html", "delete.html", "edit.html", "extract.html", "jpg-to-pdf.html", "pdf-to-jpg.html", "tool.html"]
 JS_BY_PAGE = {
     "index.html": ["assets/js/config.js", "assets/js/tools.js", "assets/js/home.js"],
     "compress.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/compress.js"],
@@ -38,6 +38,7 @@ JS_BY_PAGE = {
     "edit.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/editor-coords.js", "assets/js/editor-state.js", "assets/js/editor-manifest.js", "assets/js/edit.js"],
     "extract.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/extract.js"],
     "jpg-to-pdf.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/jpg-to-pdf.js"],
+    "pdf-to-jpg.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/pdf-to-jpg.js"],
     "tool.html": ["assets/js/tools.js", "assets/js/tool.js"],
 }
 
@@ -54,8 +55,8 @@ for page, scripts in JS_BY_PAGE.items():
         # merge.js builds "mergeStep"+Capitalized, split.js "splitStep"+Capitalized,
         # rotate.js "rotateStep"+Capitalized, delete.js "deleteStep"+Capitalized,
         # extract.js "extractStep"+Capitalized, jpg-to-pdf.js "jpgStep"+Capitalized,
-        # edit.js "editStep"+Capitalized.
-        missing = {r for r in refs if r not in defined and r not in created and not r.startswith("step") and not r.startswith("mergeStep") and not r.startswith("splitStep") and not r.startswith("rotateStep") and not r.startswith("deleteStep") and not r.startswith("extractStep") and not r.startswith("jpgStep") and not r.startswith("editStep") and r not in ("mergeStep", "splitStep", "rotateStep", "deleteStep", "extractStep", "jpgStep", "editStep")}
+        # edit.js "editStep"+Capitalized, pdf-to-jpg.js "p2jStep"+Capitalized.
+        missing = {r for r in refs if r not in defined and r not in created and not r.startswith("step") and not r.startswith("mergeStep") and not r.startswith("splitStep") and not r.startswith("rotateStep") and not r.startswith("deleteStep") and not r.startswith("extractStep") and not r.startswith("jpgStep") and not r.startswith("editStep") and not r.startswith("p2jStep") and r not in ("mergeStep", "splitStep", "rotateStep", "deleteStep", "extractStep", "jpgStep", "editStep", "p2jStep")}
         # resolve dynamic stepper ids explicitly
         dyn_ok = all(("step" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
         merge_dyn_ok = all(("mergeStep" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
@@ -64,6 +65,7 @@ for page, scripts in JS_BY_PAGE.items():
         delete_dyn_ok = all(("deleteStep" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
         extract_dyn_ok = all(("extractStep" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
         jpg_dyn_ok = all(("jpgStep" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
+        p2j_dyn_ok = all(("p2jStep" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
         edit_dyn_ok = all(x in defined for x in
                           ["edProgressFill", "edStatusText", "edApply", "edOverlay", "edThumbs"])
         if missing:
@@ -82,6 +84,8 @@ for page, scripts in JS_BY_PAGE.items():
             fail(f"{page}: dynamic extract stepper ids missing")
         elif script == "assets/js/jpg-to-pdf.js" and not jpg_dyn_ok:
             fail(f"{page}: dynamic jpg stepper ids missing")
+        elif script == "assets/js/pdf-to-jpg.js" and not p2j_dyn_ok:
+            fail(f"{page}: dynamic p2j stepper ids missing")
         elif script == "assets/js/edit.js" and not edit_dyn_ok:
             fail(f"{page}: dynamic edit stepper ids missing")
         else:

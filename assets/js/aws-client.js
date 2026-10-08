@@ -186,6 +186,12 @@ window.PdfCloud = (function () {
   }
 
   function downloadOutput(outputKey, downloadName) {
+    window.open(presignedDownloadUrl(outputKey, downloadName), "_blank", "noopener");
+  }
+
+  /* Same presigned GET URL as downloadOutput, returned as a string so pages
+   * can embed it (image previews, per-file download links). */
+  function presignedDownloadUrl(outputKey, downloadName) {
     var out = new AWS.S3({ region: cfg.REGION });
     var params = {
       Bucket: cfg.OUTPUT_BUCKET,
@@ -194,8 +200,7 @@ window.PdfCloud = (function () {
     };
     var disposition = downloadName ? contentDisposition(downloadName) : undefined;
     if (disposition) params.ResponseContentDisposition = disposition;
-    var url = out.getSignedUrl("getObject", params);
-    window.open(url, "_blank", "noopener");
+    return out.getSignedUrl("getObject", params);
   }
 
   /* ---------------- Merge PDF helpers (additive; compress path untouched) ----
@@ -911,6 +916,91 @@ window.PdfCloud = (function () {
     });
   }
 
+  /* ---------------- PDF to JPG helpers (additive; others untouched) -----
+   *
+   * Backend pdf_to_jpg contract (see backend repo README, reference only):
+   *   input:   "uploads/<request-id>/<safe>.pdf" (same INPUT bucket)
+   *   manifest:"pdf-to-jpg-requests/<request-id>.pdf2jpg.json" (uploaded LAST)
+   *     { "operation": "pdf_to_jpg", "input": ...,
+   *       "pages": [1, 3, 5], "quality": 85, "output_name": "<safe>.pdf" }
+   *   output:  "pdf-to-jpg/<request-id>/<stem>-page-001.jpg" (one per page,
+   *     original page numbers, zero-padded, requested order; exact poll)
+   *
+   * Page lists are explicit ints in REQUESTED order (checkboxes and/or range
+   * text expanded client-side via parseExtractRanges, which pdf-to-jpg
+   * reuses). Bounds are enforced by the backend, which knows the document.
+   */
+
+  function newPdfToJpgRequestId() {
+    return newMergeRequestId();
+  }
+
+  function pdfToJpgInputKey(requestId, safeBaseName) {
+    return "uploads/" + String(requestId) + "/" + String(safeBaseName);
+  }
+
+  function pdfToJpgManifestKey(requestId) {
+    return cfg.PDF2JPG_MANIFEST_PREFIX + String(requestId) + cfg.PDF2JPG_MANIFEST_SUFFIX;
+  }
+
+  /* Mirror of backend stem sanitization (shared with split/rotate/delete). */
+  function sanitizePdfToJpgStem(name, fallbackId) {
+    return sanitizeSplitStem(name, fallbackId);
+  }
+
+  function pdfToJpgPageName(stem, pageNum) {
+    var padded = String(pageNum);
+    while (padded.length < 3) padded = "0" + padded;
+    return stem + "-page-" + padded + ".jpg";
+  }
+
+  /* Deterministic output keys, one per requested page in requested order:
+   * "pdf-to-jpg/<id>/<stem>-page-001.jpg". The backend derives identical
+   * keys, so the page polls each EXACT object — never a prefix listing. */
+  function expectedPdfToJpgOutputKeys(requestId, outputName, pages) {
+    var id = String(requestId);
+    var stem = sanitizePdfToJpgStem(outputName, id);
+    return (pages || []).map(function (pageNum) {
+      return cfg.PDF2JPG_OUTPUT_DIR + "/" + id + "/" +
+        pdfToJpgPageName(stem, pageNum);
+    });
+  }
+
+  /* Pure manifest builder. Pages are required (backend rejects empties);
+   * quality defaults to PDF2JPG_DEFAULT_QUALITY when not 1-100. */
+  function buildPdfToJpgManifest(requestId, inputKey, pages, quality, outputName) {
+    var q = (typeof quality === "number" && quality >= 1 && quality <= 100)
+      ? Math.floor(quality)
+      : (cfg.PDF2JPG_DEFAULT_QUALITY || 85);
+    return {
+      operation: "pdf_to_jpg",
+      input: inputKey,
+      pages: (pages || []).slice(),
+      quality: q,
+      output_name: outputName || (String(requestId) + ".pdf")
+    };
+  }
+
+  /* Upload the pdf-to-jpg manifest (final trigger — call only after the PDF
+   * upload succeeded). Resolves with the manifest key. */
+  function putPdfToJpgManifest(requestId, manifestObj) {
+    var key = pdfToJpgManifestKey(requestId);
+    var body = JSON.stringify(manifestObj);
+    return ensureCredentials().then(function () {
+      return new Promise(function (resolve, reject) {
+        s3.putObject({
+          Bucket: cfg.INPUT_BUCKET,
+          Key: key,
+          Body: body,
+          ContentType: "application/json"
+        }, function (err) {
+          if (err) reject(err);
+          else resolve(key);
+        });
+      });
+    });
+  }
+
   /* ---------------- Edit PDF v1 helpers (additive; others untouched) -----
    *
    * Backend edit contract (see backend repo README, reference only):
@@ -1069,6 +1159,7 @@ window.PdfCloud = (function () {
     pollForOutput: pollForOutput,
     headOutput: headOutput,
     downloadOutput: downloadOutput,
+    presignedDownloadUrl: presignedDownloadUrl,
     newMergeRequestId: newMergeRequestId,
     sanitizeMergeBase: sanitizeMergeBase,
     mergeInputKey: mergeInputKey,
@@ -1102,6 +1193,14 @@ window.PdfCloud = (function () {
     expectedDeleteOutputKey: expectedDeleteOutputKey,
     buildDeleteManifest: buildDeleteManifest,
     putDeleteManifest: putDeleteManifest,
+    newPdfToJpgRequestId: newPdfToJpgRequestId,
+    pdfToJpgInputKey: pdfToJpgInputKey,
+    pdfToJpgManifestKey: pdfToJpgManifestKey,
+    sanitizePdfToJpgStem: sanitizePdfToJpgStem,
+    pdfToJpgPageName: pdfToJpgPageName,
+    expectedPdfToJpgOutputKeys: expectedPdfToJpgOutputKeys,
+    buildPdfToJpgManifest: buildPdfToJpgManifest,
+    putPdfToJpgManifest: putPdfToJpgManifest,
     newJpgToPdfRequestId: newJpgToPdfRequestId,
     sanitizeJpgFileName: sanitizeJpgFileName,
     jpgToPdfInputKey: jpgToPdfInputKey,

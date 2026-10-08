@@ -28,7 +28,7 @@ static files on S3 website hosting.
 * [x] Edit PDF workspace (viewer, 14 tools, selection, undo/redo, page ops, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
 * [x] Extract Pages (single-file picker + drag & drop, checkbox tiles + range entry, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
 * [x] JPG to PDF (multi-image picker + drag & drop, previews, reorder, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
-* [ ] PDF to JPG
+* [x] PDF to JPG (single-file picker + drag & drop, all/selected pages, quality selector, manifest upload, exact-output polling, previews, per-file + Download All) — implemented + tested, NOT deployed
 * [ ] Watermark PDF
 * [ ] Add Page Numbers
 * [ ] Protect PDF
@@ -317,6 +317,39 @@ Status:
   single “Download PDF” button uses the existing 5-minute presigned URL
   mechanism with a friendly download name. Source images are never
   modified.
+
+### PDF to JPG
+
+Status:
+
+* Backend: Implemented + tested, **NOT deployed** (no `.pdf2jpg.json`
+  trigger yet; deployment happens separately via the backend pipeline —
+  never manually from here).
+* Frontend: Implemented + statically tested, **NOT deployed**. Code pushed
+  to GitHub; AWS deployment happens automatically via the existing
+  CodePipeline — never manually.
+
+* Single-file upload: picker + drag & drop, PDF extension + 100 MB checked
+  before upload; only the first file is kept if several are dropped.
+* Page selection: pdf.js reads the page count (“All pages” expands locally
+  to 1..N, capped at 50); or “Selected pages” with a `1, 3, 5-7` textbox
+  parsed by the shared extract-style parser (syntax + optional known-count
+  bounds; backend re-validates against the real document). Order is the
+  listed order.
+* Quality: Draft 70 / Standard 85 (default) / High 95 — a manifest field,
+  rendered at fixed 150 DPI.
+* Manifest architecture: one `crypto.randomUUID()` request id per job; the
+  PDF goes to `uploads/<id>/<safe>.pdf`, then the manifest
+  `pdf-to-jpg-requests/<id>.pdf2jpg.json` is uploaded LAST (single Lambda
+  trigger): `{ "operation": "pdf_to_jpg", "input": ...,
+  "pages": [1, 3, 5], "quality": 85, "output_name": "<safe>.pdf" }`.
+  A failed PDF upload rejects the chain, so the manifest is never sent.
+* Output handling: the frontend polls HeadObject for EVERY expected key
+  `pdf-to-jpg/<id>/<stem>-page-001.jpg` in parallel (exact keys derived
+  from the manifest — never a prefix listing), then shows JPG previews
+  with per-file downloads plus a “Download All” button, all via the
+  existing 5-minute presigned URL mechanism with friendly download names.
+  The source PDF is never modified.
 
 ### Edit PDF (professional editor workspace)
 

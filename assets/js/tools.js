@@ -74,9 +74,9 @@ window.PdfTools = [
     title: "PDF to JPG",
     description: "Convert PDF pages into JPG images.",
     icon: "image",
-    status: "soon",
-    href: "tool.html?tool=pdf-to-jpg",
-    badge: "Coming soon"
+    status: "available",
+    href: "pdf-to-jpg.html",
+    badge: "Available"
   },
   {
     id: "jpg-to-pdf",

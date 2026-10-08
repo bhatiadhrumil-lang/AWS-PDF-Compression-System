@@ -28,6 +28,7 @@ phases:
       - python3 test_delete.py
       - python3 test_filenames.py
       - python3 test_jpg_to_pdf.py
+      - python3 test_pdf_to_jpg.py
 
       - 'echo "All frontend validation passed."'
 
@@ -45,6 +46,7 @@ phases:
       - cp extract.html deploy/
       - cp jpg-to-pdf.html deploy/
       - cp merge.html deploy/
+      - cp pdf-to-jpg.html deploy/
       - cp rotate.html deploy/
       - cp split.html deploy/
       - cp tool.html deploy/

@@ -64,6 +64,16 @@ window.PdfConfig = {
   JPG2PDF_MAX_IMAGES: 20,
   JPG2PDF_MAX_TOTAL_MB: 200,
 
+  /* PDF to JPG constants (mirror backend contract; client-side only).
+   * One PDF renders to one JPG per requested page at fixed 150 DPI;
+   * quality is a manifest field (1-100, default 85). */
+  PDF2JPG_MANIFEST_PREFIX: "pdf-to-jpg-requests/",
+  PDF2JPG_MANIFEST_SUFFIX: ".pdf2jpg.json",
+  PDF2JPG_OUTPUT_DIR: "pdf-to-jpg",
+  PDF2JPG_INPUT_PREFIX: "uploads/",
+  PDF2JPG_MAX_PAGES: 50,
+  PDF2JPG_DEFAULT_QUALITY: 85,
+
   /* Edit PDF v1 constants (mirror backend contract; client-side only).
    * Coordinates in manifests are PDF points, origin bottom-left
    * (see assets/js/edit.js); images upload as separate objects. */
