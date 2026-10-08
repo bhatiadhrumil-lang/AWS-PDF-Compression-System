@@ -41,6 +41,7 @@ phases:
       - cp compress.html deploy/
       - cp delete.html deploy/
       - cp edit.html deploy/
+      - cp extract.html deploy/
       - cp merge.html deploy/
       - cp rotate.html deploy/
       - cp split.html deploy/
