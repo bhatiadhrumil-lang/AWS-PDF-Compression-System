@@ -275,7 +275,10 @@ Status:
   an unimplemented button would be misleading UI.
 * Viewer: pages render via pinned pdf.js 3.11.174; net page rotations are
   baked into the base render so the canvas is WYSIWYG; pointer mapping
-  inverts the same transform (shared formula with the backend).
+  inverts the same transform (shared formula with the backend). Fresh PDFs
+  open at a responsive default scale (~100% when the workspace allows it,
+  shrink-to-fit on medium screens, fit mode on tiny screens); Fit, zoom
+  in/out, and percentage controls are unchanged.
 * Objects: unique `edit-N` ids, bounding box + resize handles + rotation
   handle (images) + delete/duplicate, double-click/Enter text editing,
   arrow-key nudge, Delete key, Esc, Ctrl+Z / Ctrl+Y (+toolbar buttons),
@@ -283,10 +286,16 @@ Status:
   fonts, size, align, underline, color, opacity. Images: PNG/JPEG magic +
   size (5 MB) + dimension (12000 px) validation, aspect-aware placement,
   move/resize/rotate. Signature: drawn strokes (draw type) or uploaded
-  image — session-only, never stored. Replace: select existing text via
-  the pdf.js text layer → union bbox → whiteout + editable replacement
-  text (visual replacement, documented). Eraser removes
-  drawings/highlights/whiteouts. Links: box + URL panel, http/https only
+  image — session-only, never stored. Replace: pick the Replace tool,
+  select existing text via the pdf.js text layer → a panel below the
+  toolbar shows the selected text plus an editable New-text field
+  (normal typing/paste/Backspace/Ctrl+A) with font/size/color →
+  Preview (overlay-only) or Apply Replacement, which commits ONE
+  history entry (whiteout + new text, single Ctrl+Z) and returns to
+  Select; Cancel/Esc clears; Delete/Backspace on a selection covers
+  just that region. Visual replacement only, documented in the UI.
+  Global shortcuts never fire inside inputs (isFormElement guard).
+  Eraser removes drawings/highlights/whiteouts. Links: box + URL panel, http/https only
   (javascript:/data:/file: rejected client AND server side).
 * Coordinates: manifest units are PDF points, origin bottom-left.
   Overlays reference FINAL (post-page-op) pages; page rotations compose

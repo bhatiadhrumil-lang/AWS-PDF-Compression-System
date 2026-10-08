@@ -50,11 +50,33 @@ window.PdfEditor = (function () {
   var lastResultName = null;
   var imageFiles = {}; // srcKey -> File (filled at apply)
   var textLayerCleanup = [];
+  var replaceSel = null; // {pageKey, pdfBox:{x,y,width,height}, text} pending replacement
+  var replacePreview = null; // ephemeral preview spec (never stored in state)
 
   function $(id) { return document.getElementById(id); }
 
   function cfg() { return window.PdfConfig; }
   function Cloud() { return window.PdfCloud; }
+
+  /* True while the event target is a form field. Global canvas shortcuts
+   * must never hijack typing, clipboard, or navigation keys inside one. */
+  function isFormElement(t) {
+    return !!t && (t instanceof HTMLInputElement ||
+      t instanceof HTMLTextAreaElement ||
+      t instanceof HTMLSelectElement ||
+      !!t.isContentEditable);
+  }
+
+  /* Comfortable initial scale for a freshly opened PDF (true zoom, where
+   * 1 means 100%). Roomy workspace -> 100%; narrower -> shrink but stay
+   * readable; tiny screens -> fit mode so the page stays fully usable. */
+  function computeDefaultZoom(pageWPt, availCssW) {
+    if (!(pageWPt > 0) || !(availCssW > 0)) return { fit: true, zoom: 1 };
+    var fitScale = availCssW / pageWPt;
+    if (fitScale >= 1) return { fit: false, zoom: 1 };
+    if (fitScale >= 0.75) return { fit: false, zoom: Math.round(fitScale * 100) / 100 };
+    return { fit: true, zoom: 1 };
+  }
 
   /* ---------- document / view model ---------- */
 
@@ -69,7 +91,10 @@ window.PdfEditor = (function () {
     gesture = null;
     lastOutputKey = null;
     imageFiles = {};
+    replaceSel = null;
+    replacePreview = null;
     clearTextLayer();
+    if (els.replacePanel) els.replacePanel.hidden = true;
     els.workPane.hidden = true;
     els.uploadPane.hidden = false;
     els.thumbsWrap.hidden = true;
@@ -143,6 +168,14 @@ window.PdfEditor = (function () {
         }
         chain.then(function () {
           recomputeView();
+          // Comfortable initial scale: ~100% when the workspace allows it,
+          // shrink-to-fit on medium screens, fit mode on tiny screens.
+          var firstKey = view.order[0];
+          var firstSize = doc.sizes[firstKey];
+          var firstDims = C.rotatedDims(firstSize.w, firstSize.h, view.rotations[firstKey] || 0);
+          var dflt = computeDefaultZoom(firstDims.w, stageAvailWidth() - 40);
+          view.fit = dflt.fit;
+          view.zoom = dflt.zoom;
           els.uploadPane.hidden = true;
           els.workPane.hidden = false;
           els.thumbsWrap.hidden = false;
@@ -163,9 +196,15 @@ window.PdfEditor = (function () {
 
   /* ---------- rendering ---------- */
 
+  function stageAvailWidth() {
+    // Measure the stage (stable layout box), NOT the canvas wrap itself:
+    // the wrap is width:fit-content and has no size before canvases render.
+    var parent = els.canvasWrap && els.canvasWrap.parentElement;
+    return (parent && parent.clientWidth) || 720;
+  }
+
   function cssWidthFor() {
-    var wrapW = els.canvasWrap.clientWidth || 720;
-    return Math.min(Math.max(280, wrapW), 900);
+    return Math.min(Math.max(280, stageAvailWidth() - 40), 900);
   }
 
   function viewDims() {
@@ -173,7 +212,8 @@ window.PdfEditor = (function () {
     var rot = currentRotation();
     var dims = C.rotatedDims(size.w, size.h, rot);
     var fitW = cssWidthFor();
-    var cssW = view.fit ? fitW : Math.min(1400, Math.max(280, fitW * view.zoom));
+    // Non-fit zoom is a TRUE scale (1 = 100%): cssW tracks page points.
+    var cssW = view.fit ? fitW : Math.min(1600, Math.max(200, dims.w * view.zoom));
     var scale = cssW / dims.w;
     return { cssW: cssW, cssH: dims.h * scale, scale: scale, rot: rot, size: size, dims: dims };
   }
@@ -442,11 +482,43 @@ window.PdfEditor = (function () {
     ctx.restore();
   }
 
+  /* Selection marker for pending Replace: translucent fill + dashed border
+   * over the selected PDF region. Painted from PDF points (never pixels). */
+  function drawReplaceMarker(ctx, vd, pdfBox) {
+    var a = toView(pdfBox.x, pdfBox.y + pdfBox.height);
+    var b = toView(pdfBox.x + pdfBox.width, pdfBox.y);
+    ctx.save();
+    ctx.fillStyle = "rgba(79,70,229,0.15)";
+    ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+    ctx.strokeStyle = "#4f46e5";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+    ctx.restore();
+  }
+
   function drawObjects(ctx, vd) {
     var key = currentKey();
     state.objects.forEach(function (obj) {
       if (obj.pageKey === key) paintObject(ctx, obj, vd, obj.id === state.selectedId);
     });
+    // Ephemeral replace preview (whiteout + new text): drawn, never stored.
+    if (replacePreview && replacePreview.pageKey === key) {
+      paintObject(ctx, {
+        type: "whiteout", x: replacePreview.box.x, y: replacePreview.box.y,
+        width: replacePreview.box.width, height: replacePreview.box.height,
+        color: "#FFFFFF", opacity: 1
+      }, vd, false);
+      if (replacePreview.text) {
+        paintObject(ctx, {
+          type: "text", x: replacePreview.box.x + 2, y: replacePreview.box.y + 2,
+          text: replacePreview.text, fontSize: replacePreview.fontSize,
+          font: replacePreview.font, align: "left", color: replacePreview.color,
+          opacity: 1, underline: false
+        }, vd, false);
+      }
+    }
+    if (replaceSel && replaceSel.pageKey === key) drawReplaceMarker(ctx, vd, replaceSel.pdfBox);
     if (gesture && gesture.paint) gesture.paint(ctx, vd);
   }
 
@@ -629,6 +701,13 @@ window.PdfEditor = (function () {
       return;
     }
     // box tools: rect ellipse highlight whiteout underline strike
+    // (replace/select/eraser/text/image/link/draw return above — replace
+    // works through the text layer + panel, never through box gestures).
+    if (tool === "replace" || tool === "select" || tool === "eraser" ||
+        tool === "text" || tool === "image" || tool === "link" ||
+        tool === "draw" || tool === "sign") {
+      return;
+    }
     gesture = { kind: "box", startCss: pos.css, startPt: pos.pt, cur: pos.css };
     gesture.paint = function (ctx) {
       var r = normRect(gesture.startCss, gesture.cur);
@@ -946,15 +1025,15 @@ window.PdfEditor = (function () {
 
   function toolHint() {
     switch (tool) {
-      case "select": return "Click an object to select, drag to move, drag handles to resize. Double-click text to edit.";
-      case "text": return "Click on the page to place text, then type.";
+      case "select": return "Click an object to select, drag to move, drag handles to resize. Double-click text to edit. Delete removes the selected object.";
+      case "text": return "Add NEW text: click the page to place a text box, then type. (To change existing PDF text, use Replace.)";
       case "image": return stagedImage ? "Click on the page to place the staged image." : "Choose an image, then click on the page to place it.";
       case "draw": return "Drag on the page to draw freehand.";
       case "highlight": return "Drag a box over content to highlight it.";
       case "whiteout": return "Drag a box to cover content (visual cover only — not secure redaction).";
       case "sign": return signMode === "draw" ? "Draw your signature on the page." : "Choose a signature image, then click to place it.";
       case "link": return "Drag a box, then enter the URL.";
-      case "replace": return "Select existing page text, then choose Replace selection.";
+      case "replace": return "Select text on the PDF above, then edit the replacement in the panel below. The original is covered (whiteout); nothing embedded is mutated.";
       case "eraser": return "Click a drawing, highlight or whiteout to remove it.";
       default: return "Drag on the page to draw a " + tool + ".";
     }
@@ -1042,6 +1121,7 @@ window.PdfEditor = (function () {
     if (name === "image" && !stagedImage) pickImage("image");
     if (name === "sign" && signMode === "upload" && !stagedSignImage) pickImage("sign");
     if (name !== "replace") clearTextLayer();
+    else if (doc && !busy) renderTextLayer(viewDims());
     renderProps();
     redrawOverlay();
   }
@@ -1209,15 +1289,20 @@ window.PdfEditor = (function () {
     els.textLayer.style.height = vd.cssH + "px";
   }
 
-  function clearTextLayer() {
+  function clearTextLayer(keepPanel) {
     els.textLayer.hidden = true;
     els.textLayer.innerHTML = "";
     els.replaceBar.hidden = true;
     textLayerCleanup = [];
+    if (!keepPanel) {
+      replaceSel = null;
+      replacePreview = null;
+      if (els.replacePanel) els.replacePanel.hidden = true;
+    }
   }
 
   function renderTextLayer(vd) {
-    clearTextLayer();
+    clearTextLayer(true);
     var key = currentKey();
     if (key.indexOf("blank-") === 0) return;
     var idx = doc.keys.indexOf(key);
@@ -1242,11 +1327,36 @@ window.PdfEditor = (function () {
     });
   }
 
-  function replaceSelection() {
+  /* Read + sanitize the Replace panel controls (single source for
+   * preview and apply, so both always agree). */
+  function replacePanelValues(fallbackText) {
+    var size = Math.min(144, Math.max(6, +els.replaceSize.value || 16));
+    var font = PDF_FONTS.indexOf(els.replaceFont.value) >= 0 ? els.replaceFont.value : "Helvetica";
+    var color = /^#[0-9a-fA-F]{6}$/.test(els.replaceColor.value || "") ? els.replaceColor.value : "#000000";
+    return { text: String(els.replaceText.value), fontSize: size, font: font, color: color, fallback: fallbackText };
+  }
+
+  function openReplacePanel() {
+    els.replaceOrig.textContent = replaceSel.text;
+    els.replaceText.value = replaceSel.text;
+    els.replaceFont.value = opts.font;
+    els.replaceSize.value = opts.fontSize;
+    els.replaceColor.value = /^#[0-9a-fA-F]{6}$/.test(opts.color || "") ? opts.color : "#000000";
+    els.replacePanel.hidden = false;
+    setTopStatus("Edit the replacement text below, then Apply Replacement.");
+    els.replaceText.focus();
+    els.replaceText.select();
+  }
+
+  /* Step 3 of the Replace workflow: turn the DOM text selection into a
+   * PDF-space pending selection and show the Replace panel. Nothing is
+   * written to editor state here — that happens once, in applyReplacement. */
+  function captureReplaceSelection(silent) {
+    if (!doc || busy || tool !== "replace") return false;
     var sel = window.getSelection();
-    if (!sel || sel.isCollapsed) {
-      setTopStatus("Select text on the page first.");
-      return;
+    if (!sel || sel.isCollapsed || !els.textLayer.contains(sel.anchorNode)) {
+      if (!silent) setTopStatus("Select text on the PDF that you want to replace.");
+      return false;
     }
     var layerRect = els.textLayer.getBoundingClientRect();
     var spans = els.textLayer.querySelectorAll("span");
@@ -1254,7 +1364,6 @@ window.PdfEditor = (function () {
     var full = "";
     spans.forEach(function (sp) {
       if (!sel.containsNode(sp, true)) return;
-      var r = sp.getRange ? null : null;
       var rr = sp.getBoundingClientRect();
       if (rr.width > 0 && rr.height > 0 &&
         rr.left >= layerRect.left - 1 && rr.right <= layerRect.right + 1) {
@@ -1265,9 +1374,9 @@ window.PdfEditor = (function () {
         full += sp.textContent;
       }
     });
-    if (!boxes.length) {
-      setTopStatus("Select text on the page first.");
-      return;
+    if (!boxes.length || !full.trim()) {
+      if (!silent) setTopStatus("Select text on the PDF that you want to replace.");
+      return false;
     }
     var x0 = Math.min.apply(null, boxes.map(function (b) { return b.x; }));
     var y0 = Math.min.apply(null, boxes.map(function (b) { return b.y; }));
@@ -1275,27 +1384,108 @@ window.PdfEditor = (function () {
     var y1 = Math.max.apply(null, boxes.map(function (b) { return b.y + b.h; }));
     var vd = viewDims();
     var size = currentSize();
-    var pdfBox = inverseBox({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, vd);
-    pdfBox = C.clampBoxToPage(pdfBox, size.w, size.h);
+    var pdfBox = C.clampBoxToPage(inverseBox({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, vd), size.w, size.h);
+    replaceSel = { pageKey: currentKey(), pdfBox: pdfBox, text: full.trim().slice(0, 2000) };
+    replacePreview = null;
+    openReplacePanel();
+    redrawOverlay();
+    refreshChrome();
+    return true;
+  }
+
+  function replaceSelection() {
+    captureReplaceSelection(false);
+  }
+
+  /* Ephemeral preview: whiteout + new text drawn on the overlay only. */
+  function previewReplacement() {
+    if (!replaceSel) return;
+    var vals = replacePanelValues(replaceSel.text);
+    replacePreview = {
+      pageKey: replaceSel.pageKey, box: replaceSel.pdfBox,
+      text: vals.text.slice(0, 2000), fontSize: vals.fontSize,
+      font: vals.font, color: vals.color
+    };
+    redrawOverlay();
+    setTopStatus("Preview — not yet applied. Apply Replacement to keep it.");
+  }
+
+  /* Whiteout the selected region + draw new text inside it. ONE history
+   * entry covers both objects, so a single Ctrl+Z removes the replacement. */
+  function applyReplacement() {
+    if (!replaceSel) return;
+    var vals = replacePanelValues(replaceSel.text);
+    if (!vals.text.trim()) {
+      setTopStatus("Enter replacement text first.");
+      els.replaceText.focus();
+      return;
+    }
+    var box = replaceSel.pdfBox;
     var group = S.nextId(state);
-    S.addObject(state, {
-      type: "whiteout", pageKey: currentKey(), x: pdfBox.x, y: pdfBox.y,
-      width: pdfBox.width, height: pdfBox.height, color: "#FFFFFF", opacity: 1, group: group
+    S.commit(state);
+    state.objects.push({
+      id: S.nextId(state), type: "whiteout", pageKey: replaceSel.pageKey,
+      x: box.x, y: box.y, width: box.width, height: box.height,
+      color: "#FFFFFF", opacity: 1, group: group
     });
     var t = {
-      type: "text", pageKey: currentKey(), x: C.round2(pdfBox.x + 2),
-      y: C.round2(pdfBox.y + 2), text: full.trim().slice(0, 200) || "Replacement",
-      fontSize: Math.min(48, Math.max(6, Math.round(pdfBox.height * 0.6))),
-      font: "Helvetica", align: "left", color: "#000000", opacity: 1,
-      underline: false, group: group
+      id: S.nextId(state), type: "text", pageKey: replaceSel.pageKey,
+      x: C.round2(box.x + 2), y: C.round2(box.y + 2),
+      text: vals.text.slice(0, 2000), fontSize: vals.fontSize, font: vals.font,
+      align: "left", color: vals.color, opacity: 1, underline: false, group: group
     };
-    S.addObject(state, t);
-    sel.removeAllRanges();
-    openTextEditor(t);
+    state.objects.push(t);
+    state.selectedId = t.id;
+    opts.font = vals.font;
+    opts.fontSize = vals.fontSize;
+    opts.color = vals.color;
+    var sel = window.getSelection();
+    if (sel) sel.removeAllRanges();
+    replaceSel = null;
+    replacePreview = null;
+    els.replacePanel.hidden = true;
+    setTool("select");
     renderProps();
     redrawOverlay();
     refreshChrome();
-    setTopStatus("Replacement placed — edit the text, then Apply Changes.");
+    setTopStatus("Replacement applied — Apply Changes to bake it into the PDF.");
+  }
+
+  function cancelReplace() {
+    var sel = window.getSelection();
+    if (sel) sel.removeAllRanges();
+    replaceSel = null;
+    replacePreview = null;
+    els.replacePanel.hidden = true;
+    setTool("select");
+    renderProps();
+    redrawOverlay();
+    refreshChrome();
+    setTopStatus("Replacement cancelled.");
+  }
+
+  /* Cover the selected region with a single whiteout object (one undo step).
+   * Only acts on an active Replace selection — never on arbitrary content. */
+  function deleteReplaceSelection() {
+    if (!replaceSel) return;
+    var box = replaceSel.pdfBox;
+    S.commit(state);
+    var wo = {
+      id: S.nextId(state), type: "whiteout", pageKey: replaceSel.pageKey,
+      x: box.x, y: box.y, width: box.width, height: box.height,
+      color: "#FFFFFF", opacity: 1
+    };
+    state.objects.push(wo);
+    state.selectedId = wo.id;
+    var sel = window.getSelection();
+    if (sel) sel.removeAllRanges();
+    replaceSel = null;
+    replacePreview = null;
+    els.replacePanel.hidden = true;
+    renderProps();
+    redrawOverlay();
+    refreshChrome();
+    setTopStatus("Selected content covered — undo (Ctrl+Z) to restore.");
   }
 
   /* ---------- apply flow ---------- */
@@ -1431,7 +1621,9 @@ window.PdfEditor = (function () {
 
   function onKeyDown(e) {
     if (!doc || busy) return;
-    var typing = /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || "");
+    // Never hijack typing: inputs, textareas, selects, and editable regions
+    // keep Backspace, Delete, Ctrl+A/C/V, arrows, Home/End to themselves.
+    if (isFormElement(document.activeElement) || isFormElement(e.target)) return;
     // Ctrl+Z undo, Ctrl+Y / Ctrl+Shift+Z redo.
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey) {
       e.preventDefault();
@@ -1444,17 +1636,23 @@ window.PdfEditor = (function () {
       if (S.redo(state)) { renderThumbs(); renderView(); renderProps(); refreshChrome(); }
       return;
     }
-    if (typing) return;
     if (e.key === "Delete" || e.key === "Backspace") {
-      if (state.selectedId) {
+      if (replaceSel) {
+        e.preventDefault();
+        deleteReplaceSelection();
+      } else if (state.selectedId) {
         e.preventDefault();
         S.removeObject(state, state.selectedId);
         renderProps(); redrawOverlay(); refreshChrome();
       }
     } else if (e.key === "Escape") {
-      state.selectedId = null;
-      setTool("select");
-      renderProps(); redrawOverlay();
+      if (replaceSel) {
+        cancelReplace();
+      } else {
+        state.selectedId = null;
+        setTool("select");
+        renderProps(); redrawOverlay();
+      }
     } else if (e.key === "v" || e.key === "V") setTool("select");
     else if (e.key === "t" || e.key === "T") setTool("text");
     else if (e.key === "i" || e.key === "I") setTool("image");
@@ -1501,6 +1699,9 @@ window.PdfEditor = (function () {
       prevPage: $("edPrevPage"), nextPage: $("edNextPage"), pageLabel: $("edPageLabel"),
       zoomOut: $("edZoomOut"), zoomIn: $("edZoomIn"), zoomLabel: $("edZoomLabel"), zoomFit: $("edZoomFit"),
       replaceBar: $("edReplaceBar"), replaceBtn: $("edReplaceBtn"),
+      replacePanel: $("edReplacePanel"), replaceOrig: $("edReplaceOrig"),
+      replaceText: $("edReplaceText"), replaceFont: $("edReplaceFont"),
+      replaceSize: $("edReplaceSize"), replaceColor: $("edReplaceColor"),
       progressPane: $("edProgressPane"), progressFill: $("edProgressFill"),
       statusText: $("edStatusText"), progressPercent: $("edProgressPercent"),
       resultCard: $("edResultCard"), downloadBtn: $("edDownloadBtn"), resetBtn: $("edResetBtn"),
@@ -1557,6 +1758,28 @@ window.PdfEditor = (function () {
     els.zoomOut.addEventListener("click", function () { stepZoom(-1); });
     els.zoomFit.addEventListener("click", function () { view.fit = true; renderView(); });
     els.replaceBtn.addEventListener("click", replaceSelection);
+    // Replace panel font choices mirror the Text tool fonts.
+    PDF_FONTS.forEach(function (name) {
+      var opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = FONT_LABELS[name];
+      els.replaceFont.appendChild(opt);
+    });
+    // Auto-capture: finishing a text selection in Replace mode opens the panel.
+    els.textLayer.addEventListener("mouseup", function () {
+      if (tool !== "replace" || !doc || busy) return;
+      setTimeout(function () { captureReplaceSelection(true); }, 0);
+    });
+    $("edReplaceCancel").addEventListener("click", cancelReplace);
+    $("edReplacePreview").addEventListener("click", previewReplacement);
+    $("edReplaceApply").addEventListener("click", applyReplacement);
+    $("edReplaceDelete").addEventListener("click", deleteReplaceSelection);
+    // Typing in the panel refreshes a live preview instead of committing.
+    ["edReplaceText", "edReplaceFont", "edReplaceSize", "edReplaceColor"].forEach(function (id) {
+      $(id).addEventListener("input", function () {
+        if (replacePreview) previewReplacement();
+      });
+    });
     els.insertBlank.addEventListener("click", function () {
       if (busy || !doc) return;
       var first = doc.sizes[view.order[0]];
@@ -1617,6 +1840,8 @@ window.PdfEditor = (function () {
     _view: function () { return view; },
     _doc: function () { return doc; },
     _tool: function () { return tool; },
+    _isFormElement: isFormElement,
+    _computeDefaultZoom: computeDefaultZoom,
     setTool: setTool,
     resetAll: resetAll,
     version: 2

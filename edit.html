@@ -60,6 +60,31 @@
     <button class="tool-btn" data-tool="eraser" title="Eraser (click a drawing to remove it)">Eraser</button>
   </div>
   <div class="wrap editor-props" id="edProps" aria-live="polite"></div>
+  <div class="wrap editor-replace-panel" id="edReplacePanel" hidden>
+    <div class="editor-replace-panel-inner">
+      <strong>Replace Selected Text</strong>
+      <p class="replace-note">Select text on the PDF that you want to replace. The original is covered with whiteout and your text is drawn over it (visual replacement).</p>
+      <div>
+        <span class="replace-label">Selected text:</span>
+        <div class="replace-orig" id="edReplaceOrig"></div>
+      </div>
+      <div>
+        <label class="replace-label" for="edReplaceText">New text:</label>
+        <textarea class="replace-new" id="edReplaceText" rows="3"></textarea>
+      </div>
+      <div class="replace-controls">
+        <label>Font <select id="edReplaceFont"></select></label>
+        <label>Size <input type="number" id="edReplaceSize" min="6" max="144" value="16"></label>
+        <label>Color <input type="color" id="edReplaceColor" value="#000000"></label>
+      </div>
+      <div class="replace-actions">
+        <button class="btn ghost btn-sm" id="edReplaceCancel" type="button">Cancel</button>
+        <button class="btn ghost btn-sm" id="edReplacePreview" type="button">Preview</button>
+        <button class="btn btn-sm" id="edReplaceApply" type="button">Apply Replacement</button>
+        <button class="btn ghost btn-sm danger-text" id="edReplaceDelete" type="button">Delete selected content</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <main class="editor-main">

@@ -270,6 +270,18 @@ li.thumb canvas { width: 100%; height: auto; border-radius: 4px; background: #ff
 .editor-zoom { display: inline-flex; align-items: center; gap: 6px; margin-left: 12px; }
 .editor-replace-bar { display: flex; align-items: center; gap: 10px; justify-content: center; margin-top: 10px; font-size: 0.9rem; color: var(--muted); }
 .editor-note { color: var(--muted); font-size: 0.88rem; }
+/* Replace panel: compact bar below the toolbar (never covers the PDF). */
+.editor-replace-panel { border-top: 1px solid var(--line); background: #fafbff; }
+.editor-replace-panel-inner { display: grid; gap: 10px; padding: 12px 0 14px; }
+.editor-replace-panel-inner > strong { font-size: 1rem; }
+.replace-note { margin: 0; color: var(--muted); font-size: 0.85rem; }
+.replace-label { font-weight: 700; font-size: 0.88rem; }
+.replace-orig { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-top: 4px; max-height: 76px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.replace-new { width: 100%; min-height: 64px; margin-top: 4px; padding: 8px 10px; font: 500 1rem/1.5 var(--font); border: 1px solid var(--line); border-radius: 8px; resize: vertical; }
+.replace-controls { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; font-size: 0.9rem; }
+.replace-controls input[type="number"] { width: 72px; }
+.replace-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.danger-text { color: var(--danger); }
 @media (max-width: 900px) {
   .editor-main { flex-direction: column; }
   .editor-thumbs { width: 100%; flex: none; position: static; max-height: none; border-right: none; border-bottom: 1px solid var(--line); }

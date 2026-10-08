@@ -263,6 +263,75 @@ class EditPageTests(unittest.TestCase):
         for tag in ['"v1"', "'v1'", '"v2"', '"v3"', "versioned"]:
             self.assertNotIn(tag, blob)
 
+    def test_20_replace_panel(self):
+        # Panel lives below the toolbar (never covers the PDF) with a real
+        # editable textarea + font/size/color controls + action buttons.
+        for el in ["edReplacePanel", "edReplaceOrig", "edReplaceText",
+                   "edReplaceFont", "edReplaceSize", "edReplaceColor",
+                   "edReplaceCancel", "edReplacePreview", "edReplaceApply",
+                   "edReplaceDelete"]:
+            self.assertIn('id="%s"' % el, EDIT_HTML)
+        self.assertRegex(EDIT_HTML, r'<textarea[^>]*id="edReplaceText"')
+        self.assertRegex(EDIT_HTML, r'<select[^>]*id="edReplaceFont"')
+        self.assertIn("Apply Replacement", EDIT_HTML)
+        self.assertIn("Delete selected content", EDIT_HTML)
+        # Selected PDF text is shown via textContent (never innerHTML).
+        self.assertIn("els.replaceOrig.textContent", EDIT_JS)
+        self.assertNotIn("replaceOrig.innerHTML", EDIT_JS)
+        # Capture uses the pdf.js text layer + rotation-aware PDF coords.
+        self.assertIn("captureReplaceSelection", EDIT_JS)
+        self.assertIn("inverseBox", EDIT_JS)
+        self.assertIn("clampBoxToPage", EDIT_JS)
+
+    def test_21_replace_single_undo(self):
+        # Whiteout + new text share ONE history entry (single Ctrl+Z).
+        m = re.search(r"function applyReplacement\(\).*?setTopStatus\(\"Replacement applied",
+                      EDIT_JS, re.DOTALL)
+        self.assertIsNotNone(m)
+        body = m.group(0)
+        self.assertEqual(body.count("S.commit(state)"), 1)
+        self.assertIn('type: "whiteout"', body)
+        self.assertIn('type: "text"', body)
+        self.assertNotIn("S.addObject", body)  # addObject commits separately
+        self.assertIn("Preview", EDIT_HTML)
+        self.assertIn("replacePreview", EDIT_JS)
+        # Empty replacement is rejected, panel stays open.
+        self.assertIn("Enter replacement text first.", EDIT_JS)
+
+    def test_22_form_element_guard(self):
+        # Global shortcuts never hijack inputs/textareas/selects/editables.
+        self.assertIn("isFormElement", EDIT_JS)
+        for token in ["HTMLInputElement", "HTMLTextAreaElement",
+                      "HTMLSelectElement", "isContentEditable"]:
+            self.assertIn(token, EDIT_JS)
+        m = re.search(r"function onKeyDown\(e\)\s*\{(.*?)\n    \}",
+                      EDIT_JS, re.DOTALL)
+        self.assertIsNotNone(m)
+        head = m.group(1)
+        guard = "isFormElement(document.activeElement)"
+        self.assertIn(guard, head)
+        # The guard runs before ANY shortcut (including Ctrl+Z).
+        self.assertLess(head.index(guard), head.index("ctrlKey"))
+        # Delete on a Replace selection whites out exactly that region.
+        self.assertIn("deleteReplaceSelection", EDIT_JS)
+
+    def test_23_default_zoom(self):
+        # Responsive initial scale (~100% when roomy, fit on tiny screens).
+        self.assertIn("computeDefaultZoom", EDIT_JS)
+        self.assertIn("stageAvailWidth", EDIT_JS)
+        self.assertIn("view.fit = dflt.fit", EDIT_JS)
+        # Zoom controls + Fit still wired and working.
+        for token in ["edZoomIn", "edZoomOut", "edZoomFit", "edZoomLabel",
+                      "stepZoom", "view.fit = true"]:
+            self.assertIn(token, EDIT_JS + EDIT_HTML)
+
+    def test_24_object_delete_guarded(self):
+        # Editor objects stay selectable + deletable with visible selection;
+        # Delete never fires while typing in a form field.
+        self.assertIn("drawSelection", EDIT_JS)
+        self.assertIn("S.removeObject(state, state.selectedId)", EDIT_JS)
+        self.assertIn("S.undo(state)", EDIT_JS)
+
 
 if __name__ == "__main__":
     unittest.main()
