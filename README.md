@@ -26,12 +26,12 @@ static files on S3 website hosting.
 * [x] Friendly errors with expandable technical details
 * [x] Editor + future-tool placeholder pages (honest “Coming soon”, no fake processing)
 * [x] Edit PDF workspace (viewer, 14 tools, selection, undo/redo, page ops, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
-* [x] Extract Pages (single-file picker + drag & drop, checkbox tiles + range entry, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
-* [x] JPG to PDF (multi-image picker + drag & drop, previews, reorder, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
+* [x] Extract Pages (single-file picker + drag & drop, checkbox tiles + range entry, manifest upload, exact-output polling, download) — implemented + DEPLOYED
+* [x] JPG to PDF (multi-image picker + drag & drop, previews, reorder, manifest upload, exact-output polling, download) — implemented + DEPLOYED
 * [x] PDF to JPG (single-file picker + drag & drop, all/selected pages, quality selector, manifest upload, exact-output polling, previews, per-file + Download All) — implemented + tested + DEPLOYED
+* [x] Protect PDF (single-file picker + drag & drop, password + confirm with show/hide, AES-256 encryption, manifest upload, exact-output polling, download; password never logged) — implemented + tested, deployment via the existing pipeline
 * [ ] Watermark PDF
 * [ ] Add Page Numbers
-* [ ] Protect PDF
 
 Only `[x]` items actually work live, except where an item is explicitly
 marked NOT deployed (code-complete but awaiting its deployment phase).
@@ -47,6 +47,8 @@ when the interactive PDF editor lands (it will need canvas rendering).
 index.html            homepage: hero, popular tools, all tools, how-it-works
 compress.html         dedicated compressor page (the working tool)
 merge.html            merge page (multi-file select, reorder, progress, download)
+pdf-to-jpg.html       pdf-to-jpg page (all/selected pages, quality, previews, download all)
+protect.html          protect page (single PDF, password + confirm, encrypted download)
 edit.html             edit page (pdf.js preview, overlay editor, manifest, download)
 tool.html?tool=<id>  generic placeholder for every other future tool
 assets/css/styles.css shared stylesheet (responsive, mobile-first)
@@ -56,6 +58,9 @@ assets/js/aws-client.js Cognito/S3 service: upload, poll, download, errors (+ me
 assets/js/home.js     renders tool cards on the homepage
 assets/js/compress.js compressor page flow
 assets/js/merge.js    merge page flow (validate, reorder, ordered uploads, manifest, poll)
+assets/js/extract.js  extract page flow (checkbox tiles + ranges, manifest, poll)
+assets/js/pdf-to-jpg.js pdf-to-jpg page flow (pages + quality, manifest, parallel polls)
+assets/js/protect.js  protect page flow (password validation, manifest, exact-key poll)
 assets/js/edit.js     editor workspace (viewer, tools, selection, history, pages, apply flow)
 assets/js/editor-coords.js pure coordinate math (PDF points, rotation composition)
 assets/js/editor-state.js objects, page ops, undo/redo history
@@ -128,8 +133,11 @@ resolves, no AWS secret patterns are committed, and the SDK version is pinned
 consistently. `test_merge.py` covers the merge page (multi-select, 2–20 and
 100 MB / 200 MB limits, remove/reorder, manifest order + operation + keys,
 unique request ids, manifest-after-uploads sequencing, exact-output polling)
-plus a compression regression check. There is no automated browser test suite;
-validation is static plus manual walkthrough (see commit message / PR notes).
+plus a compression regression check; `test_pdf_to_jpg.py` and
+`test_protect.py` cover their pages the same way (validation mirrors,
+manifest shape, output-key shape, sequencing, no-password leakage checks).
+There is no automated browser test suite; validation is static plus manual
+walkthrough (see commit message / PR notes).
 
 ### Merge PDF
 
@@ -348,6 +356,38 @@ Status:
   with per-file downloads plus a “Download All” button, all via the
   existing 5-minute presigned URL mechanism with friendly download names.
   The source PDF is never modified.
+
+### Protect PDF
+
+Status:
+
+* Backend: Implemented + tested + **deployed** (`.protect.json` trigger
+  live; Lambda on the protect image).
+* Frontend: Implemented + statically tested; deployed via the existing
+  pipeline (CodePipeline auto-deploys main).
+
+* Single-file upload: picker + drag & drop, PDF extension + 100 MB checked
+  before upload; only the first file is kept if several are dropped.
+* Password: “Password” + “Confirm password” fields with Show/Hide
+  toggles, `autocomplete="new-password"` (never browser-saved), minimum 8
+  characters (shared constant `PROTECT_MIN_PASSWORD_LEN` in config.js;
+  no complexity rules), and a match check before upload.
+* Security (the password is SENSITIVE end to end): it is never logged,
+  never written into filenames or output keys, never echoed into error
+  messages, and the local copy is nulled out the moment the manifest is
+  uploaded and again on success/reset/failure. The page’s memo/keys are
+  asserted password-free by `test_protect.py`.
+* Manifest architecture: one `crypto.randomUUID()` request id per job; the
+  PDF goes to `uploads/<id>/<safe>.pdf`, then the manifest
+  `protect-requests/<id>.protect.json` is uploaded LAST (single Lambda
+  trigger): `{ "operation": "protect_pdf", "input": ...,
+  "password": "...", "output_name": "<safe>.pdf" }`. A failed PDF upload
+  rejects the chain, so the manifest is never sent.
+* Output handling: the frontend polls HeadObject for the EXACT key
+  `protected/<id>/<stem>-protected.pdf` (same polling pattern) — then a
+  single “Download Protected PDF” button uses the existing 5-minute
+  presigned URL mechanism. The encrypted copy is AES-256 (pypdf backend);
+  the original PDF is never modified. A lost password cannot be recovered.
 
 ### Edit PDF (professional editor workspace)
 

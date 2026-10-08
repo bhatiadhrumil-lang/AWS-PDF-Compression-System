@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Password-protect a PDF online — encrypt your PDF with AES-256 and download a protected copy. Powered by AWS.">
+<title>Protect PDF — PDF Toolkit</title>
+<link rel="stylesheet" href="assets/css/styles.css">
+<script src="https://sdk.amazonaws.com/js/aws-sdk-2.1692.0.min.js" defer></script>
+<script src="assets/js/config.js" defer></script>
+<script src="assets/js/aws-client.js" defer></script>
+<script src="assets/js/protect.js" defer></script>
+</head>
+<body>
+
+<header class="site-header">
+  <nav class="nav" aria-label="Main navigation">
+    <a class="brand" href="index.html"><span class="brand-mark">PDF</span><span>PDF Toolkit</span></a>
+    <div class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="index.html#tools">PDF Tools</a>
+      <a href="compress.html">Compress</a>
+      <a href="merge.html">Merge</a>
+      <a href="split.html">Split</a>
+      <a href="extract.html">Extract</a>
+      <a href="protect.html" class="active">Protect</a>
+      <a href="edit.html">Edit PDF</a>
+    </div>
+  </nav>
+</header>
+
+<section class="tool-hero">
+  <div class="wrap">
+    <a class="back-link" href="index.html">&larr; All tools</a>
+    <h1>Protect PDF</h1>
+    <p>Add a password to a PDF — you get a new encrypted copy, your original is never changed.</p>
+  </div>
+</section>
+
+<main class="wrap page">
+  <div class="stack">
+
+    <section class="card" aria-labelledby="protect-upload-heading">
+      <h2 id="protect-upload-heading" style="margin-top:0">1. Choose your PDF</h2>
+      <label class="dropzone" id="protectDropzone">
+        <input id="protectFiles" type="file" accept=".pdf,application/pdf">
+        <div class="dz-icon" aria-hidden="true">🔒</div>
+        <strong>Drag &amp; drop your PDF here</strong>
+        <p>or click to browse &middot; PDF only &middot; one file &middot; up to 100 MB</p>
+      </label>
+      <p class="merge-hint" id="protectFileName" aria-live="polite">No file selected.</p>
+
+      <h2 style="margin-bottom:8px">2. Set a password</h2>
+      <p class="merge-hint" id="protectPwdHint">At least 8 characters — the same password will be needed to open the encrypted PDF.</p>
+      <div style="display:grid;gap:10px;max-width:420px">
+        <label for="protectPassword"><strong>Password</strong></label>
+        <div style="display:flex;gap:8px;align-items:stretch">
+          <input id="protectPassword" type="password" minlength="8" autocomplete="new-password" spellcheck="false"
+                 placeholder="Choose a password" aria-describedby="protectPwdHint"
+                 style="flex:1;padding:10px">
+          <button type="button" class="btn ghost" id="protectToggle1" aria-label="Show or hide password">Show</button>
+        </div>
+        <label for="protectConfirm"><strong>Confirm password</strong></label>
+        <div style="display:flex;gap:8px;align-items:stretch">
+          <input id="protectConfirm" type="password" minlength="8" autocomplete="new-password" spellcheck="false"
+                 placeholder="Repeat the password" aria-describedby="protectPwdHint"
+                 style="flex:1;padding:10px">
+          <button type="button" class="btn ghost" id="protectToggle2" aria-label="Show or hide confirm password">Show</button>
+        </div>
+      </div>
+
+      <p class="merge-hint" id="protectHint">Select a PDF file to begin.</p>
+
+      <div class="progress" id="protectProgressWrap" hidden>
+        <div id="protectProgressFill"></div>
+      </div>
+      <div class="progress-row"><span id="protectStatus" class="status-line">Ready — select a PDF and choose a password to begin.</span><span id="protectProgressPercent"></span></div>
+      <ol class="stepper" aria-label="Progress">
+        <li id="protectStepSelect">Select</li>
+        <li id="protectStepUpload">Upload</li>
+        <li id="protectStepProcess">Protect</li>
+        <li id="protectStepDone">Download</li>
+      </ol>
+      <p style="margin:18px 0 0"><button class="btn block" id="protectBtn" disabled>Select a PDF to begin</button></p>
+    </section>
+
+    <section class="card result" id="protectResultCard" hidden aria-labelledby="protect-result-heading" aria-live="polite">
+      <h2 id="protect-result-heading" style="margin-top:0">✅ Your PDF is protected!</h2>
+      <p>This copy is encrypted and will ask for your password when opened. Remember it — a forgotten password cannot be recovered.</p>
+      <p class="merge-totals">Download name: <span id="protectResultName">—</span></p>
+      <p style="margin:0 0 12px"><button class="btn block" id="protectDownloadBtn">Download Protected PDF</button></p>
+      <p style="margin:0"><button class="btn ghost block" id="protectAnotherBtn">Protect Another PDF</button></p>
+    </section>
+
+    <section class="card error-box" id="protectErrorCard" hidden aria-live="assertive">
+      <p id="protectErrorMessage">Something went wrong.</p>
+      <details>
+        <summary>Technical details</summary>
+        <div id="protectErrorDetails">—</div>
+      </details>
+      <p style="margin:12px 0 0"><button class="btn ghost block" id="protectRetryBtn">Try Again</button></p>
+    </section>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div>
+      <h4>PDF Toolkit</h4>
+      <p>Cloud-native PDF utilities on AWS (S3 · Lambda · Cognito).</p>
+    </div>
+    <div>
+      <h4>Tools</h4>
+      <ul>
+        <li><a href="compress.html">Compress PDF</a></li>
+        <li><a href="merge.html">Merge PDF</a></li>
+        <li><a href="split.html">Split PDF</a></li>
+        <li><a href="extract.html">Extract Pages</a></li>
+        <li><a href="protect.html">Protect PDF</a></li>
+        <li><a href="edit.html">Edit PDF</a></li>
+        <li><a href="index.html#tools">All tools</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Project</h4>
+      <ul>
+        <li><a href="https://github.com/bhatiadhrumil-lang/AWS-PDF-Compression-System" rel="noopener">GitHub repository</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="fineprint">Download links expire after 5 minutes. Protect uses one request manifest per job, and your password is never stored or logged — keep it safe, a lost password cannot be recovered.</div>
+</footer>
+
+</body>
+</html>

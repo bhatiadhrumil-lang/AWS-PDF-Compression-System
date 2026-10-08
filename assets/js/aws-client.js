@@ -1001,10 +1001,99 @@ window.PdfCloud = (function () {
     });
   }
 
-  /* ---------------- Edit PDF v1 helpers (additive; others untouched) -----
-   *
-   * Backend edit contract (see backend repo README, reference only):
-   *   input:   "uploads/<request-id>/<safe>.pdf" (same INPUT bucket)
+  /* ---------------- PDF Protect helpers (additive; others untouched) ---
+    *
+    * Backend protect_pdf contract (see backend repo README, reference only):
+    *   input:   "uploads/<request-id>/<safe>.pdf" (same INPUT bucket)
+    *   manifest:"protect-requests/<request-id>.protect.json" (uploaded LAST)
+    *     { "operation": "protect_pdf", "input": ...,
+    *       "password": "...", "output_name": "<safe>.pdf" }
+    *   output:  "protected/<request-id>/<stem>-protected.pdf" (exact poll)
+    *
+    * The password is SENSITIVE end to end: never logged, never echoed into
+    * error messages, never placed in filenames or output keys, and pages
+    * null it out once the download is offered. The manifest must carry the
+    * password for the backend to work, so it is uploaded LAST, exactly like
+    * the other trigger manifests, and kept only for the lifetime of the run.
+    */
+
+  function newProtectRequestId() {
+    return newMergeRequestId();
+  }
+
+  function protectInputKey(requestId, safeBaseName) {
+    return "uploads/" + String(requestId) + "/" + String(safeBaseName);
+  }
+
+  function protectManifestKey(requestId) {
+    return cfg.PROTECT_MANIFEST_PREFIX + String(requestId) + cfg.PROTECT_MANIFEST_SUFFIX;
+  }
+
+  /* Mirror of backend stem sanitization (shared with split/rotate stems). */
+  function sanitizeProtectStem(name, fallbackId) {
+    return sanitizeSplitStem(name, fallbackId);
+  }
+
+  /* Deterministic output key: "protected/<id>/<stem>-protected.pdf". The
+   * backend derives the identical key, so the page polls this EXACT object. */
+  function expectedProtectOutputKey(requestId, outputName) {
+    var id = String(requestId);
+    var stem = sanitizeProtectStem(outputName, id);
+    return cfg.PROTECT_OUTPUT_DIR + "/" + id + "/" + stem + "-protected.pdf";
+  }
+
+  /* Pure password checks (no DOM, no AWS). Missing/short/mismatch only —
+   * the backend enforces length authoritatively; no complexity rules were
+   * requested. Returns { ok, errors[] }. */
+  function validateProtectPasswords(password, confirm) {
+    var min = cfg.PROTECT_MIN_PASSWORD_LEN || 8;
+    var errors = [];
+    var pwd = typeof password === "string" ? password : "";
+    if (!pwd || !pwd.length) {
+      errors.push("Password must be at least " + min + " characters.");
+    } else if (pwd.length < min) {
+      errors.push("Password must be at least " + min + " characters.");
+    }
+    if (errors.length === 0 && String(confirm || "") !== pwd) {
+      errors.push("Passwords do not match.");
+    }
+    return { ok: errors.length === 0, errors: errors };
+  }
+
+  /* Pure manifest builder. Carries the password (required by the backend);
+   * the caller never logs, displays, or re-uses it after the run completes. */
+  function buildProtectManifest(requestId, inputKey, password, outputName) {
+    return {
+      operation: "protect_pdf",
+      input: inputKey,
+      password: password,
+      output_name: outputName || (String(requestId) + ".pdf")
+    };
+  }
+
+  /* Upload the protect manifest (final trigger — call only after the PDF
+   * upload succeeded). Resolves with the manifest key. */
+  function putProtectManifest(requestId, manifestObj) {
+    var key = protectManifestKey(requestId);
+    var body = JSON.stringify(manifestObj);
+    return ensureCredentials().then(function () {
+      return new Promise(function (resolve, reject) {
+        s3.putObject({
+          Bucket: cfg.INPUT_BUCKET,
+          Key: key,
+          Body: body,
+          ContentType: "application/json"
+        }, function (err) {
+          if (err) reject(err);
+          else resolve(key);
+        });
+      });
+    });
+  }
+
+   /* ---------------- Edit PDF v1 helpers (additive; others untouched) -----
+    *
+    * Backend edit contract (see backend repo README, reference only):
    *   images:  "uploads/<request-id>/img-<n>.png|jpg" (uploaded BEFORE manifest)
    *   manifest:"edit-requests/<request-id>.edit.json" (uploaded LAST)
    *     { "operation": "edit", "version": 1, "input": ...,
@@ -1218,6 +1307,14 @@ window.PdfCloud = (function () {
     buildExtractManifest: buildExtractManifest,
     parseExtractRanges: parseExtractRanges,
     putExtractManifest: putExtractManifest,
+    newProtectRequestId: newProtectRequestId,
+    protectInputKey: protectInputKey,
+    protectManifestKey: protectManifestKey,
+    sanitizeProtectStem: sanitizeProtectStem,
+    expectedProtectOutputKey: expectedProtectOutputKey,
+    validateProtectPasswords: validateProtectPasswords,
+    buildProtectManifest: buildProtectManifest,
+    putProtectManifest: putProtectManifest,
     newEditRequestId: newEditRequestId,
     editInputKey: editInputKey,
     editManifestKey: editManifestKey,

@@ -74,6 +74,16 @@ window.PdfConfig = {
   PDF2JPG_MAX_PAGES: 50,
   PDF2JPG_DEFAULT_QUALITY: 85,
 
+  /* Protect PDF constants (mirror backend contract; client-side only).
+   * One PDF encrypts into one password-protected PDF (AES-256). The
+   * password lives ONLY in the uploaded manifest and in page memory for
+   * the run; it is never logged, stored, or written into output keys. */
+  PROTECT_MANIFEST_PREFIX: "protect-requests/",
+  PROTECT_MANIFEST_SUFFIX: ".protect.json",
+  PROTECT_OUTPUT_DIR: "protected",
+  PROTECT_INPUT_PREFIX: "uploads/",
+  PROTECT_MIN_PASSWORD_LEN: 8,
+
   /* Edit PDF v1 constants (mirror backend contract; client-side only).
    * Coordinates in manifests are PDF points, origin bottom-left
    * (see assets/js/edit.js); images upload as separate objects. */

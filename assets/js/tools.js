@@ -110,9 +110,9 @@ window.PdfTools = [
     title: "Protect PDF",
     description: "Add password protection to sensitive PDFs.",
     icon: "lock",
-    status: "soon",
-    href: "tool.html?tool=protect",
-    badge: "Coming soon"
+    status: "available",
+    href: "protect.html",
+    badge: "Available"
   }
 ];
 
