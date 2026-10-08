@@ -28,7 +28,7 @@ static files on S3 website hosting.
 * [x] Edit PDF workspace (viewer, 14 tools, selection, undo/redo, page ops, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
 * [x] Extract Pages (single-file picker + drag & drop, checkbox tiles + range entry, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
 * [x] JPG to PDF (multi-image picker + drag & drop, previews, reorder, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
-* [x] PDF to JPG (single-file picker + drag & drop, all/selected pages, quality selector, manifest upload, exact-output polling, previews, per-file + Download All) — implemented + tested, NOT deployed
+* [x] PDF to JPG (single-file picker + drag & drop, all/selected pages, quality selector, manifest upload, exact-output polling, previews, per-file + Download All) — implemented + tested + DEPLOYED
 * [ ] Watermark PDF
 * [ ] Add Page Numbers
 * [ ] Protect PDF
@@ -322,12 +322,10 @@ Status:
 
 Status:
 
-* Backend: Implemented + tested, **NOT deployed** (no `.pdf2jpg.json`
-  trigger yet; deployment happens separately via the backend pipeline —
-  never manually from here).
-* Frontend: Implemented + statically tested, **NOT deployed**. Code pushed
-  to GitHub; AWS deployment happens automatically via the existing
-  CodePipeline — never manually.
+* Backend: Implemented + tested + **DEPLOYED** (`.pdf2jpg.json` trigger
+  live; Lambda on the pdf_to_jpg image; verified end-to-end on AWS).
+* Frontend: Implemented + statically tested + **DEPLOYED** to the live
+  website (all pages return HTTP 200).
 
 * Single-file upload: picker + drag & drop, PDF extension + 100 MB checked
   before upload; only the first file is kept if several are dropped.
