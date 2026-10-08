@@ -724,6 +724,42 @@ window.PdfCloud = (function () {
     };
   }
 
+  /* Validate an overlay image before staging: PNG/JPEG type + extension,
+   * magic bytes, and size cap (mirrors backend validate_image_file).
+   * Resolves {ok: true} or {ok: false, message}. Never uploads. */
+  function validateEditImage(file) {
+    function fail(message) { return { ok: false, message: message }; }
+    if (!file) return Promise.resolve(fail("No file selected."));
+    var name = String(file.name || "").toLowerCase();
+    var typeOk = file.type === "image/png" || file.type === "image/jpeg";
+    var extOk = /\.png$/.test(name) || /\.jpe?g$/.test(name);
+    if (!typeOk && !extOk) {
+      return Promise.resolve(fail("Invalid image format. Please choose a PNG or JPEG file."));
+    }
+    var maxBytes = (cfg.EDIT_MAX_IMAGE_MB || 5) * 1024 * 1024;
+    if (file.size > maxBytes) {
+      return Promise.resolve(fail("Image is too large (over " + (cfg.EDIT_MAX_IMAGE_MB || 5) + " MB). Please choose a smaller image."));
+    }
+    if (file.size === 0) {
+      return Promise.resolve(fail("That image file appears to be empty."));
+    }
+    return new Promise(function (resolve) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        var bytes = new Uint8Array(reader.result || []);
+        var isJpeg = bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xD8;
+        var isPng = bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 &&
+          bytes[2] === 0x4E && bytes[3] === 0x47;
+        if (isJpeg || isPng) resolve({ ok: true });
+        else resolve(fail("Invalid image format. Please choose a real PNG or JPEG file."));
+      };
+      reader.onerror = function () {
+        resolve(fail("Could not read that image file."));
+      };
+      reader.readAsArrayBuffer(file.slice(0, 4));
+    });
+  }
+
   /* Upload one overlay image to its exact namespaced key. PNG and JPEG
    * only (the backend validates magic bytes and rejects the rest). */
   function uploadEditImage(file, key, onProgress) {
@@ -834,6 +870,7 @@ window.PdfCloud = (function () {
     sanitizeEditStem: sanitizeEditStem,
     expectedEditOutputKey: expectedEditOutputKey,
     buildEditManifest: buildEditManifest,
+    validateEditImage: validateEditImage,
     uploadEditImage: uploadEditImage,
     putEditManifest: putEditManifest,
     friendlyError: friendlyError,

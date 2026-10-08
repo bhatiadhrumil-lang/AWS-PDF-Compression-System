@@ -35,7 +35,7 @@ JS_BY_PAGE = {
     "split.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/split.js"],
     "rotate.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/rotate.js"],
     "delete.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/delete.js"],
-    "edit.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/edit.js"],
+    "edit.html": ["assets/js/config.js", "assets/js/aws-client.js", "assets/js/editor-coords.js", "assets/js/editor-state.js", "assets/js/editor-manifest.js", "assets/js/edit.js"],
     "tool.html": ["assets/js/tools.js", "assets/js/tool.js"],
 }
 
@@ -46,18 +46,21 @@ for page, scripts in JS_BY_PAGE.items():
     for script in scripts:
         js = (ROOT / script).read_text(encoding="utf-8")
         refs = set(re.findall(r'(?:getElementById|\$\()\s*["\']([^"\']+)["\']', js))
+        # ids created dynamically via innerHTML (id="..." inside JS strings)
+        created = set(re.findall(r'id="([^"]+)"', js))
         # compress.js builds stepper ids dynamically ("step"+Capitalized),
         # merge.js builds "mergeStep"+Capitalized, split.js "splitStep"+Capitalized,
         # rotate.js "rotateStep"+Capitalized, delete.js "deleteStep"+Capitalized,
         # edit.js "editStep"+Capitalized.
-        missing = {r for r in refs if r not in defined and not r.startswith("step") and not r.startswith("mergeStep") and not r.startswith("splitStep") and not r.startswith("rotateStep") and not r.startswith("deleteStep") and not r.startswith("editStep") and r not in ("mergeStep", "splitStep", "rotateStep", "deleteStep", "editStep")}
+        missing = {r for r in refs if r not in defined and r not in created and not r.startswith("step") and not r.startswith("mergeStep") and not r.startswith("splitStep") and not r.startswith("rotateStep") and not r.startswith("deleteStep") and not r.startswith("editStep") and r not in ("mergeStep", "splitStep", "rotateStep", "deleteStep", "editStep")}
         # resolve dynamic stepper ids explicitly
         dyn_ok = all(("step" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
         merge_dyn_ok = all(("mergeStep" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
         split_dyn_ok = all(("splitStep" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
         rotate_dyn_ok = all(("rotateStep" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
         delete_dyn_ok = all(("deleteStep" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
-        edit_dyn_ok = all(("editStep" + s) in defined for s in ["Select", "Upload", "Process", "Done"])
+        edit_dyn_ok = all(x in defined for x in
+                          ["edProgressFill", "edStatusText", "edApply", "edOverlay", "edThumbs"])
         if missing:
             fail(f"{page} <- {script}: missing ids {sorted(missing)}")
         elif script == "assets/js/compress.js" and not dyn_ok:
@@ -135,26 +138,40 @@ if len(sdk_refs) == 1:
 else:
     fail(f"inconsistent SDK pins: {sorted(sdk_refs)}")
 
-# 6. brace balance in JS
-for js_file in sorted((ROOT / "assets/js").glob("*.js")):
-    text = js_file.read_text(encoding="utf-8")
-    # strip comments first (they may contain quotes), then strings
-    text = re.sub(r"//[^\n]*|/\*.*?\*/", "", text, flags=re.S)
-    text = re.sub(r"'(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"|`(?:[^`\\]|\\.)*`", "", text)
-    pairs = {"{": "}", "(": ")", "[": "]"}
-    stack = []
-    balanced = True
-    for ch in text:
-        if ch in pairs:
-            stack.append(pairs[ch])
-        elif ch in pairs.values():
-            if not stack or stack.pop() != ch:
-                balanced = False
-                break
-    if not balanced or stack:
-        fail(f"{js_file.name}: unbalanced brackets/braces/parens")
-    else:
-        ok(f"{js_file.name}: brackets balanced")
+# 6. JS syntax: authoritative parse with esprima when installed
+# (pip install esprima), else the crude bracket-balance fallback.
+try:
+    import esprima as _esprima
+except ImportError:
+    _esprima = None
+
+if _esprima is not None:
+    for js_file in sorted((ROOT / "assets/js").glob("*.js")):
+        try:
+            _esprima.parseScript(js_file.read_text(encoding="utf-8"))
+            ok(f"{js_file.name}: parses OK")
+        except Exception as exc:
+            fail(f"{js_file.name}: JS syntax error: {exc}")
+else:
+    for js_file in sorted((ROOT / "assets/js").glob("*.js")):
+        text = js_file.read_text(encoding="utf-8")
+        # strip comments first (they may contain quotes), then strings
+        text = re.sub(r"//[^\n]*|/\*.*?\*/", "", text, flags=re.S)
+        text = re.sub(r"'(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"|`(?:[^`\\]|\\.)*`", "", text)
+        pairs = {"{": "}", "(": ")", "[": "]"}
+        stack = []
+        balanced = True
+        for ch in text:
+            if ch in pairs:
+                stack.append(pairs[ch])
+            elif ch in pairs.values():
+                if not stack or stack.pop() != ch:
+                    balanced = False
+                    break
+        if not balanced or stack:
+            fail(f"{js_file.name}: unbalanced brackets/braces/parens")
+        else:
+            ok(f"{js_file.name}: brackets balanced")
 
 # 7. placeholders must not fake processing (edit.html is a real tool now)
 for probe in ["tool.html", "assets/js/tool.js"]:

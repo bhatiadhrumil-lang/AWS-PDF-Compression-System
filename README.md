@@ -25,7 +25,7 @@ static files on S3 website hosting.
   `.pdf` lowercased for the trigger filter; unique namespace per upload)
 * [x] Friendly errors with expandable technical details
 * [x] Editor + future-tool placeholder pages (honest “Coming soon”, no fake processing)
-* [x] Edit PDF v1 page (pdf.js preview, overlay editor: text/draw/highlight/rect/image, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
+* [x] Edit PDF workspace (viewer, 14 tools, selection, undo/redo, page ops, manifest upload, exact-output polling, download) — implemented + tested, NOT deployed
 * [ ] Extract Pages
 * [ ] PDF to JPG
 * [ ] JPG to PDF
@@ -56,7 +56,10 @@ assets/js/aws-client.js Cognito/S3 service: upload, poll, download, errors (+ me
 assets/js/home.js     renders tool cards on the homepage
 assets/js/compress.js compressor page flow
 assets/js/merge.js    merge page flow (validate, reorder, ordered uploads, manifest, poll)
-assets/js/edit.js     edit page flow (pdf.js preview, overlay tools, ordered uploads, manifest, poll)
+assets/js/edit.js     editor workspace (viewer, tools, selection, history, pages, apply flow)
+assets/js/editor-coords.js pure coordinate math (PDF points, rotation composition)
+assets/js/editor-state.js objects, page ops, undo/redo history
+assets/js/editor-manifest.js manifest build + ordered S3 upload flow
 assets/js/tool.js     renders generic placeholders from the registry
 ```
 
@@ -250,41 +253,60 @@ Status:
   `delete/<id>/<stem>-deleted.pdf` (same polling pattern) — then a single
   “Download PDF” button uses the existing 5-minute presigned URL mechanism.
 
-### Edit PDF v1
+### Edit PDF (professional editor workspace)
 
 Status:
 
 * Backend: Implemented + local/docker-tested, **NOT deployed** (no
   `.edit.json` trigger yet; Lambda still runs the pre-edit image).
-* Frontend: Implemented + statically tested + headless-browser smoke-tested,
-  **NOT deployed** (live site still serves the placeholder edit page).
+* Frontend: Implemented + statically tested + headless-browser smoke-tested
+  (12/12 interaction checks in real Chromium: boot, PDF load, thumbnails,
+  text/rect placement, select, undo, manifest build, page-op, rotation
+  composition), **NOT deployed**. Code pushed to GitHub; AWS deployment
+  happens automatically via the existing CodePipeline — never manually.
 
-* Single-file upload: picker + drag & drop, PDF extension + 100 MB checked
-  before upload; only the first file is kept if several are dropped.
-* Preview: pages render in-browser via pinned pdf.js 3.11.174 (cdnjs);
-  prev/next navigation; an overlay canvas aligned to the rendered page.
-* Tools: text (click to place, size/color), freehand draw (pointer drag,
-  width/color), highlight (drag box, color/opacity), rectangle (drag box,
-  color/width), image (PNG/JPEG picker, click to place at 200x150pt).
-  Per-page edits list with remove, undo-last, and clear-page.
-* Coordinates: manifest units are PDF points, origin bottom-left —
-  `pt = px * (pageWidthPt / canvasCssWidth)`, y flipped against page height.
-  Converted once at creation, so the manifest is deterministic; the backend
-  re-validates every box/point against the real mediabox.
+* Workspace (`edit.html` + `assets/js/editor-*.js`, `edit.js`):
+  top bar (Undo/Redo/Apply + live status), toolbars (Select, Text, Image,
+  Rect, Ellipse, Line, Arrow, Highlight, Draw, Whiteout, Sign, Link,
+  Replace, Eraser), thumbnail rail with per-page rotate/delete/move (drag
+  reorder) + insert blank, single-page canvas (base PDF + overlay +
+  optional text layer), zoom (fit/50–300%), status bar. Responsive:
+  sidebar collapses to a horizontal rail on small screens. No Form tool —
+  an unimplemented button would be misleading UI.
+* Viewer: pages render via pinned pdf.js 3.11.174; net page rotations are
+  baked into the base render so the canvas is WYSIWYG; pointer mapping
+  inverts the same transform (shared formula with the backend).
+* Objects: unique `edit-N` ids, bounding box + resize handles + rotation
+  handle (images) + delete/duplicate, double-click/Enter text editing,
+  arrow-key nudge, Delete key, Esc, Ctrl+Z / Ctrl+Y (+toolbar buttons),
+  snapshot history (100 states, never a PDF reload). Text: 12 PDF-safe
+  fonts, size, align, underline, color, opacity. Images: PNG/JPEG magic +
+  size (5 MB) + dimension (12000 px) validation, aspect-aware placement,
+  move/resize/rotate. Signature: drawn strokes (draw type) or uploaded
+  image — session-only, never stored. Replace: select existing text via
+  the pdf.js text layer → union bbox → whiteout + editable replacement
+  text (visual replacement, documented). Eraser removes
+  drawings/highlights/whiteouts. Links: box + URL panel, http/https only
+  (javascript:/data:/file: rejected client AND server side).
+* Coordinates: manifest units are PDF points, origin bottom-left.
+  Overlays reference FINAL (post-page-op) pages; page rotations compose
+  into geometry with the backend-identical formula at manifest build.
+  The backend re-validates everything against the real mediabox.
 * Manifest architecture: one `crypto.randomUUID()` request id per job; the
   PDF goes to `uploads/<id>/<safe>.pdf`, then overlay images to
   `uploads/<id>/img-<n>.png|jpg`, then the manifest
   `edit-requests/<id>.edit.json` is uploaded LAST (single Lambda trigger):
   `{ "operation": "edit", "version": 1, "input": ...,
-  "output_name": "<safe>.pdf", "edits": [...] }`. Any failed upload rejects
+  "output_name": "<safe>.pdf", "pages": [...], "edits": [...] }`
+  (sequential uploads, never `Promise.all`). Any failed upload rejects
   the chain, so the manifest is never sent.
 * Output handling: the frontend polls HeadObject for the EXACT key
   `edit/<id>/<stem>-edited.pdf` (same polling pattern) — then a single
   “Download edited PDF” button uses the existing 5-minute presigned URL
   mechanism.
-* Limitations (v1): Helvetica only; images stretch to the given box;
-  overlays apply in unrotated page space (`/Rotate` pages may misalign);
-  no in-place text editing of existing content — overlays only.
+* Limitations: whiteout is a visual cover, NOT secure redaction;
+  no in-place mutation of existing PDF text (whiteout + replacement);
+  12 built-in fonts only; single-line text; links http/https only.
 
 ## Deployment
 
