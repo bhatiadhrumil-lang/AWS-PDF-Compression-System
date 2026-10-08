@@ -498,14 +498,18 @@ window.PdfEditor = (function () {
     return null;
   }
 
-  /* Link safety: only http(s) URLs. Dangerous schemes
+  /* Link safety: only http(s) URLs (e.g. https://example.com). Dangerous schemes
    * (javascript:, data:, file:, ftp:, ...) are rejected here AND
    * server-side; the editor never navigates to user URLs itself. */
   function isSafeLinkUrl(url) {
     var u = String(url || "").trim();
     if (!u || u.length > 2000) return false;
-    if (!/^https?:\/\//i.test(u)) return false;
-    if (/[\s<>"']/.test(u)) return false;
+    // NOTE: written as [/][/] instead of escaped slashes so the character
+    // sequence "//" never appears inside a regex literal here.
+    if (!/^https?:[/][/]/i.test(u)) return false;
+    // NOTE: hex escapes below stand for double/single quotes, so this
+    // regex literal contains no quote characters itself.
+    if (/[\s<>\x22\x27]/.test(u)) return false;
     var lower = u.toLowerCase();
     return ["javascript:", "data:", "file:", "ftp:", "vbscript:"].every(
       function (scheme) { return lower.indexOf(scheme) !== 0; });
@@ -902,7 +906,7 @@ window.PdfEditor = (function () {
       } else if (sel.type === "image") {
         html += '<div class="props-row"><label>Rotation <input type="number" id="edPropRot" value="' + (sel.rotation || 0) + '" min="-180" max="180" step="1" style="width:70px"></label>°</div>';
       } else if (sel.type === "link") {
-        html += '<div class="props-row"><label>URL <input type="url" id="edLinkUrl" value="' + esc(sel.url || "") + '" placeholder="https://…" style="width:260px"></label></div>';
+        html += '<div class="props-row"><label>URL <input type="url" id="edLinkUrl" value="' + esc(sel.url || "") + '" placeholder="https:\u002F\u002F…" style="width:260px"></label></div>';
       }
       if (sel.color !== undefined && sel.type !== "link") {
         html += '<div class="props-row"><label>Color <input type="color" id="edPropColor" value="' + esc(sel.color) + '"></label>';
@@ -921,7 +925,7 @@ window.PdfEditor = (function () {
         if (signMode === "upload") html += '<button class="mini-btn" data-act="pick-sign">Choose file…</button><span>' + (stagedSignImage ? esc(stagedSignImage.file.name) : "none staged") + "</span>";
         html += "</div>";
       }
-      if (tool === "link") html += '<div class="props-row"><label>URL <input type="url" id="edLinkUrlNew" value="' + esc(opts.url) + '" placeholder="https://…" style="width:260px"></label></div>';
+      if (tool === "link") html += '<div class="props-row"><label>URL <input type="url" id="edLinkUrlNew" value="' + esc(opts.url) + '" placeholder="https:\u002F\u002F…" style="width:260px"></label></div>';
     }
     els.props.innerHTML = html;
     wireProps(sel);
